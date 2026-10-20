@@ -10,7 +10,7 @@ Hardware/browser validation and long-session testing are still required.
 
 ## What it does
 
-- Select one hardware input channel and send it equally to both virtual channels.
+- Select one hardware input channel, or blend inputs 1 and 2, and send the result equally to both virtual channels.
 - Apply input trim, offline speech noise reduction, a high-pass filter, bass/air shelves, low-mid EQ, presence EQ, compression,
   output gain, and a −1 dBFS limiter.
 - Compare with the raw signal using Bypass, or silence the output using Mute.
@@ -167,15 +167,21 @@ The LCD curve includes all four bands and the rumble high-pass filter.
 Level & Dynamics groups input trim, compressor threshold/ratio and output
 gain. Voice EQ groups the rumble high-pass, bass, body, clarity and air bands.
 The source and headphone selectors align at the top, and both processing
-sections share a fixed header height.
+sections share a fixed header height. All knob sections use the same column
+positions. Listen sits beside the other action buttons; its independent volume
+control lives below Headphone Output.
 
 Studio Finish adds optional split-band de-essing to soften sharp S sounds
-and a short diffuse mono room reverb. Both start at zero. For podcasts and
+and a short diffuse mono room reverb. Both start at zero. Its section switch
+disables both effects without losing their amounts. For podcasts and
 calls, a dry voice is the default; use reverb sparingly when desired. These
 controls do not repair clipping, room echo or poor microphone placement.
 
-Choose Save, enter a name, then select that voice from Saved voices to recall
-it. Saving the same name updates it. Presets persist locally and contain only
+Choose Save New and enter a name. Saved voices appear as buttons. A clean
+voice loads with one click. When a saved voice has been edited, an orange dot
+marks it. Click a voice to choose the overwrite target, then click it again to
+confirm saving your current sound. Cancel or another processing edit cancels
+confirmation. Saving the same name in the Save New dialog updates it. Presets persist locally and contain only
 processing settings; loading one keeps the current microphone, channel,
 headphone output/level, mute and bypass. Save your current sound before
 trying Natural or Flat.
@@ -191,3 +197,7 @@ The footer shows Connected as the published virtual microphone name while
 processing is active, with Off to stop sending audio. On starts it again.
 Normal connection guidance is not repeated in a separate status row;
 source-loss and error messages remain visible when needed.
+
+First-run setup explains microphone access, driver installation and listening.
+The question-mark button reopens setup. Reading the walkthrough does not request
+permissions or start recording. See [design](DESIGN.md) for layout and control states.

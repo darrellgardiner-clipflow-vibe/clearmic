@@ -222,14 +222,35 @@ final class ProcessorTests: XCTestCase {
         XCTAssertEqual(Array(UnsafeBufferPointer(start: buffers[3], count: 3)), [0, 0, 0])
         XCTAssertEqual(Array(UnsafeBufferPointer(start: buffers[4], count: 3)), [0.2, 0.2, 0.2])
         XCTAssertEqual(Array(UnsafeBufferPointer(start: buffers[5], count: 3)), [0.2, 0.2, 0.2])
+        CMProcessorSetRouting(processor, .max, 2, .max, 0)
+        withUnsafePointer(to: &stamp) { time in
+            XCTAssertEqual(CMRender(0, time, input, time, output, time, UnsafeMutableRawPointer(processor)), 0)
+        }
+        for pointer in [buffers[4], buffers[5]] {
+            for sample in UnsafeBufferPointer(start: pointer, count: 3) { XCTAssertEqual(sample, 0.55, accuracy: 0.0001) }
+        }
+        XCTAssertEqual(CMProcessorGetMeters(processor).routingErrors, 0)
+        inputList[1].mData = nil
+        withUnsafePointer(to: &stamp) { time in
+            XCTAssertEqual(CMRender(0, time, input, time, output, time, UnsafeMutableRawPointer(processor)), 0)
+        }
+        for pointer in buffers.suffix(4) { XCTAssertEqual(Array(UnsafeBufferPointer(start: pointer, count: 3)), [0, 0, 0]) }
+        XCTAssertEqual(CMProcessorGetMeters(processor).routingErrors, 1)
     }
 
-    private func routeFixture(monitorOffset: UInt32 = .max, monitorChannels: UInt32 = 0) -> ([Float], UInt64) {
+    func testBothInputsBlendAtEqualWeightWithoutLeakingToOtherOutputs() {
+        let (output, errors) = routeFixture(inputChannel: .max)
+        let expected: [Float] = [0, 0, 0.5, 0.5, 0, 0, 0.3, 0.3, 0, 0, 0.5, 0.5]
+        XCTAssertEqual(errors, 0)
+        for (actual, expected) in zip(output, expected) { XCTAssertEqual(actual, expected, accuracy: 0.0001) }
+    }
+
+    private func routeFixture(inputChannel: UInt32 = 1, monitorOffset: UInt32 = .max, monitorChannels: UInt32 = 0) -> ([Float], UInt64) {
         let processor = CMProcessorCreate(48000)!
         defer { CMProcessorDestroy(processor) }
         var controls = CMDefaultControls(); controls.bypass = 1; controls.monitorGainDB = -6.0206
         CMProcessorSetControls(processor, controls)
-        CMProcessorSetRouting(processor, 1, 2, monitorOffset, monitorChannels)
+        CMProcessorSetRouting(processor, inputChannel, 2, monitorOffset, monitorChannels)
         var source: [Float] = [0.9, 0.1, 0.8, -0.2, 0.7, 0.3]
         var destination = [Float](repeating: 99, count: 12)
         source.withUnsafeMutableBytes { sourceBytes in

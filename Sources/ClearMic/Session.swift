@@ -20,6 +20,7 @@ struct VoiceSettings: Codable, Equatable {
     var makeup = 0.0
     var deEss = 0.0
     var reverb = 0.0
+    var studioEnabled = true
     var noiseReduction = true
     var compression = true
     var bypass = false
@@ -32,7 +33,7 @@ struct VoiceSettings: Codable, Equatable {
         CMControls(inputGainDB: Float(inputGain), highPassHz: Float(highPass), mudGainDB: Float(mud),
                    presenceGainDB: Float(presence), thresholdDB: Float(threshold), ratio: Float(ratio),
                    makeupDB: Float(makeup), bypass: bypass ? 1 : 0, muted: muted ? 1 : 0,
-                   compressionEnabled: compression ? 1 : 0, monitorGainDB: Float(monitorGain), noiseReductionEnabled: noiseReduction ? 1 : 0, bassGainDB: Float(bass), airGainDB: Float(air), deEssAmount: Float(deEss / 100), reverbMix: Float(reverb / 100))
+                   compressionEnabled: compression ? 1 : 0, monitorGainDB: Float(monitorGain), noiseReductionEnabled: noiseReduction ? 1 : 0, bassGainDB: Float(bass), airGainDB: Float(air), deEssAmount: studioEnabled ? Float(deEss / 100) : 0, reverbMix: studioEnabled ? Float(reverb / 100) : 0)
     }
 
     var presetSettings: VoiceSettings {
@@ -60,6 +61,37 @@ struct VoicePreset: Codable, Identifiable {
     let id: String
     var name: String
     var settings: VoiceSettings
+
+    init(id: String, name: String, settings: VoiceSettings) {
+        self.id = id; self.name = name; self.settings = settings
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, name, settings }
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        let value = try container.decode([String: JSONSetting].self, forKey: .settings)
+        settings = VoiceSettings.load(try JSONEncoder().encode(value))
+    }
+}
+
+private enum JSONSetting: Codable {
+    case string(String), number(Double), bool(Bool)
+    init(from decoder: Decoder) throws {
+        let value = try decoder.singleValueContainer()
+        if let bool = try? value.decode(Bool.self) { self = .bool(bool) }
+        else if let number = try? value.decode(Double.self) { self = .number(number) }
+        else { self = .string(try value.decode(String.self)) }
+    }
+    func encode(to encoder: Encoder) throws {
+        var value = encoder.singleValueContainer()
+        switch self {
+        case .string(let item): try value.encode(item)
+        case .number(let item): try value.encode(item)
+        case .bool(let item): try value.encode(item)
+        }
+    }
 }
 
 @MainActor
@@ -67,7 +99,7 @@ final class Session: ObservableObject {
     static let shared = Session()
     @Published var settings: VoiceSettings {
         didSet {
-            if oldValue.presetSettings != settings.presetSettings { selectedPresetID = "" }
+            if oldValue.presetSettings != settings.presetSettings { pendingPresetID = nil }
             if let encoded = try? JSONEncoder().encode(settings) { defaults.set(encoded, forKey: "voiceSettings") }
             let inputChanged = oldValue.sourceUID != settings.sourceUID || oldValue.channel != settings.channel
             let outputChanged = oldValue.monitorUID != settings.monitorUID || oldValue.monitoring != settings.monitoring
@@ -86,8 +118,10 @@ final class Session: ObservableObject {
             } else { route?.update(settings.controls) }
         }
     }
+    @Published private(set) var onboardingComplete = false
     @Published private(set) var presets: [VoicePreset] = []
     @Published private(set) var selectedPresetID = ""
+    @Published private(set) var pendingPresetID: String?
     @Published private(set) var devices: [AudioDevice] = []
     @Published private(set) var outputs: [AudioDevice] = []
     @Published private(set) var running = false
@@ -113,6 +147,29 @@ final class Session: ObservableObject {
     private var stalledTicks = 0
     private let logger = Logger(subsystem: "org.clearmic.app", category: "Audio")
 
+    var presetIsDirty: Bool {
+        guard let preset = presets.first(where: { $0.id == selectedPresetID }) else { return false }
+        return preset.settings.presetSettings != settings.presetSettings
+    }
+
+    func choosePreset(_ id: String) {
+        guard let index = presets.firstIndex(where: { $0.id == id }) else { return }
+        if pendingPresetID == id {
+            savePreset(name: presets[index].name)
+        } else if presetIsDirty {
+            pendingPresetID = id
+        } else {
+            applyPreset(id)
+        }
+    }
+
+    func completeOnboarding() {
+        onboardingComplete = true
+        defaults.set(true, forKey: "completedOnboarding")
+    }
+
+    func cancelPresetOverwrite() { pendingPresetID = nil }
+
     var selectedDevice: AudioDevice? { devices.first { $0.uid == settings.sourceUID } }
     var selectedMonitor: AudioDevice? { outputs.first { $0.uid == settings.monitorUID } }
     var canStart: Bool { selectedDevice != nil && !starting }
@@ -125,6 +182,7 @@ final class Session: ObservableObject {
              try AudioRoute(source: $0, channel: $1, monitor: $2, controls: $3)
          }, pollDevices: Bool = true) {
         self.defaults = defaults
+        onboardingComplete = defaults.bool(forKey: "completedOnboarding")
         self.listDevices = listDevices
         self.permission = permission
         self.makeRoute = makeRoute
@@ -286,6 +344,7 @@ final class Session: ObservableObject {
     }
 
     func savePreset(name: String) {
+        pendingPresetID = nil
         let name = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(60))
         guard !name.isEmpty else { return }
         if let index = presets.firstIndex(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
@@ -300,6 +359,7 @@ final class Session: ObservableObject {
     }
 
     func applyPreset(_ id: String) {
+        pendingPresetID = nil
         guard let preset = presets.first(where: { $0.id == id }) else { return }
         var next = preset.settings
         next.sourceUID = settings.sourceUID; next.channel = settings.channel
@@ -311,6 +371,7 @@ final class Session: ObservableObject {
     }
 
     func applyNatural() {
+        selectedPresetID = ""; pendingPresetID = nil
         var preset = VoiceSettings()
         preset.sourceUID = settings.sourceUID; preset.channel = settings.channel
         preset.muted = settings.muted
@@ -319,6 +380,7 @@ final class Session: ObservableObject {
     }
 
     func applyFlat() {
+        selectedPresetID = ""; pendingPresetID = nil
         var preset = settings
         preset.deEss = 0; preset.reverb = 0
         preset.bass = 0; preset.air = 0

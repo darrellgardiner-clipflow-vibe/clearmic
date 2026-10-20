@@ -149,7 +149,7 @@ final class AudioRoute: AudioRouting {
         guard source.uid != AudioHardware.microphoneUID, !source.uid.hasPrefix("org.clearmic.route.") else {
             throw RouteError("Choose a physical microphone to avoid a feedback loop.")
         }
-        guard channel >= 0 && channel < source.inputChannels else { throw RouteError("That input channel is unavailable.") }
+        guard (channel >= 0 && channel < source.inputChannels) || (channel == -1 && source.inputChannels >= 2) else { throw RouteError("That input channel is unavailable.") }
         guard abs(source.sampleRate - 48000) < 1 else {
             throw RouteError("\(source.name) provides \(Int(source.sampleRate)) Hz. ClearMic currently needs a 48,000 Hz input; Bluetooth microphones may not support it. Choose a 48 kHz microphone, or set a supported interface to 48,000 Hz in Audio MIDI Setup.")
         }
@@ -181,7 +181,7 @@ final class AudioRoute: AudioRouting {
             processor = created
             CMProcessorSetControls(created, controls)
             let monitorOffset = monitor == nil ? UInt32.max : separateMonitor ? UInt32(source.outputChannels + virtualChannels) : 0
-            CMProcessorSetRouting(created, UInt32(channel), hasVirtual ? UInt32(source.outputChannels) : UInt32.max,
+            CMProcessorSetRouting(created, channel == -1 ? UInt32.max : UInt32(channel), hasVirtual ? UInt32(source.outputChannels) : UInt32.max,
                                   monitorOffset, UInt32(min(2, monitor?.outputChannels ?? 0)))
             try AudioHardware.check(AudioDeviceCreateIOProcID(aggregate, CMRender, UnsafeMutableRawPointer(created), &ioProc), "Create audio callback")
             try AudioHardware.check(AudioDeviceStart(aggregate, ioProc), "Start microphone")

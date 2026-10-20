@@ -55,8 +55,10 @@ the build scripts deliberately do not do that as a test side effect.
 
 ## Native UI rendering
 
-Run `scripts/render-ui.sh` to render the actual SwiftUI content at 1080, 820,
-600, 420 and 320 points wide in both light and dark appearances into `build/ui/`. The helper draws its own offscreen hosting
+Run `scripts/render-ui.sh` to render actual SwiftUI fixtures at 17 widths
+from 320 to 1280 points, including both sides of each layout threshold, in
+light and dark appearances into `build/ui/`. Optional width arguments narrow
+the render, for example `scripts/render-ui.sh 320 740`. The helper draws its own offscreen hosting
 view, without desktop capture, microphone capture or UI automation. Inspect
 the images for wrapping and control depth. Resize the running app to check
 scrolling, keyboard focus and pressed/hover states; the static renders do not
@@ -192,3 +194,38 @@ independent mic-slash label, so both can be shown together. Monitor On
 reflects an active monitor route, not just a saved toggle. A lifecycle test
 verifies Listen can restart after Stop and can disable headphone monitoring
 without stopping virtual mic processing.
+
+## Impeccable layout and state audit, 0.1.8
+
+The audit applies the workspace Impeccable grid, spacing, responsive, copy and
+state disciplines to native SwiftUI. There is no web/CSS detector in this repo.
+
+| Finding | Resolution |
+| --- | --- |
+| Listen detached from the other action keys | One leading row, with equal cap dimensions at every width |
+| Knobs drift across sections with different control counts | Shared full-width columns for every section; short rows keep their tracks |
+| Narrow layouts center short groups | Explicit leading alignment and a wrapping button layout |
+| Oversized header and misplaced monitor level | Header removed; independent level below Headphone Output |
+| Verbose Studio Finish and no section bypass | Paragraph removed; toggle bypasses effects while preserving amounts |
+| Saved voices hidden in a selector; modified identity lost | Voice buttons, dirty dot, two-click overwrite target/confirmation |
+| Connection label and power control bunched together | Flexible gap across the full footer width |
+| Channel selector competes with the microphone name | Compact adjacent 1/2/Both control; Both averages physical inputs 1 and 2 |
+| Permissions unexplained before first use | Three-page setup with persistent completion and reopenable help |
+
+Native fixtures cover widths 320, 379/380, 391/392, 439/440, 539/540, 663/664,
+739/740, 787/788, 1080 and 1280 points in both appearances. Fixture preferences
+are isolated and removed afterward; no personal presets, microphone capture,
+desktop capture or UI automation are used. Long voice names, a modified saved
+voice, overwrite confirmation and all three setup pages are also rendered.
+
+Thirty-three tests pass through `scripts/check.sh`, followed by release app
+and universal driver builds with verified local signatures. Added assertions
+exercise two-click saving without discarding edits, cancellation after further
+processing edits, routing/mute exclusion from preset dirtiness, persisted
+completion without a permission request, old preset migration, retained studio
+amounts when bypassed, and equal-weight Both routing for interleaved and separate
+buffers. Missing blend input produces silent outputs and a routing error.
+
+Static layout and injected-boundary checks do not prove live window dragging,
+VoiceOver, actual permission dialogs, a completed installed-app update or physical
+audio capture. Those remain user journeys to verify in the installed application.

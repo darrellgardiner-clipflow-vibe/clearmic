@@ -40,6 +40,7 @@ CMProcessor * _Nullable CMProcessorCreate(double sampleRate);
 void CMProcessorDestroy(CMProcessor *processor);
 void CMProcessorSetControls(CMProcessor *processor, CMControls controls);
 // UINT32_MAX disables the virtual or monitor destination. Call before starting I/O.
+// inputChannel UINT32_MAX blends physical inputs 1 and 2 equally.
 void CMProcessorSetRouting(CMProcessor *processor, uint32_t inputChannel, uint32_t outputOffset,
                            uint32_t monitorOffset, uint32_t monitorChannels);
 CMMeters CMProcessorGetMeters(const CMProcessor *processor);

@@ -310,20 +310,35 @@ OSStatus CMRender(AudioObjectID, const AudioTimeStamp *, const AudioBufferList *
     for (uint32_t i = 0; i < output->mNumberBuffers; ++i) {
         if (output->mBuffers[i].mData) std::memset(output->mBuffers[i].mData, 0, output->mBuffers[i].mDataByteSize);
     }
-    uint32_t channel = p->inputChannel;
-    const AudioBuffer *source = nullptr;
-    for (uint32_t i = 0; i < input->mNumberBuffers; ++i) {
-        const auto &buffer = input->mBuffers[i];
-        if (channel < buffer.mNumberChannels) { source = &buffer; break; }
-        channel -= buffer.mNumberChannels;
-    }
-    if (!source || !source->mData || !source->mNumberChannels) {
+    // UINT32_MAX blends the physical source's first two channels at equal weight.
+    const bool blend = p->inputChannel == UINT32_MAX;
+    const auto findChannel = [input](uint32_t channel, const AudioBuffer *&source, uint32_t &offset) {
+        for (uint32_t i = 0; i < input->mNumberBuffers; ++i) {
+            const auto &buffer = input->mBuffers[i];
+            if (channel < buffer.mNumberChannels) {
+                source = &buffer; offset = channel;
+                return buffer.mData && buffer.mNumberChannels;
+            }
+            channel -= buffer.mNumberChannels;
+        }
+        return false;
+    };
+    const AudioBuffer *source = nullptr, *second = nullptr;
+    uint32_t channel = 0, secondChannel = 0;
+    if (!findChannel(blend ? 0 : p->inputChannel, source, channel) ||
+        (blend && !findChannel(1, second, secondChannel))) {
         p->routingErrors.fetch_add(1, std::memory_order_relaxed); return noErr;
     }
     const uint32_t frames = source->mDataByteSize / (sizeof(float) * source->mNumberChannels);
-    if (frames > maxFrames) { p->routingErrors.fetch_add(1, std::memory_order_relaxed); return noErr; }
+    if (frames > maxFrames || (blend && second->mDataByteSize / (sizeof(float) * second->mNumberChannels) != frames)) {
+        p->routingErrors.fetch_add(1, std::memory_order_relaxed); return noErr;
+    }
     const auto *data = static_cast<const float *>(source->mData);
-    for (uint32_t i = 0; i < frames; ++i) p->scratch[i] = data[i * source->mNumberChannels + channel];
+    const auto *secondData = blend ? static_cast<const float *>(second->mData) : nullptr;
+    for (uint32_t i = 0; i < frames; ++i) {
+        const float first = data[i * source->mNumberChannels + channel];
+        p->scratch[i] = blend ? 0.5f * (first + secondData[i * second->mNumberChannels + secondChannel]) : first;
+    }
     p->process(p->scratch.data(), frames);
     uint32_t flatChannel = 0, written = 0, monitored = 0;
     const float monitorGain = amplitude(p->controls.monitorGainDB);

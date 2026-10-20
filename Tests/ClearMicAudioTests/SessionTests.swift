@@ -69,6 +69,81 @@ final class SessionTests: XCTestCase {
         XCTAssertFalse(restored.running)
     }
 
+    @MainActor func testDirtyVoiceNeedsTwoClicksAndKeepsEditsUntilConfirmed() {
+        let suite = "ClearMicTests.\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let session = Session(defaults: defaults, listDevices: { [] }, permission: { false }, pollDevices: false)
+        session.savePreset(name: "Podcast")
+        let podcast = session.presets[0].id
+        session.settings.bass = 3
+        session.savePreset(name: "Warm")
+        let warm = session.presets[1].id
+        session.choosePreset(podcast)
+        XCTAssertEqual(session.settings.bass, 0)
+        session.settings.bass = 5
+        XCTAssertTrue(session.presetIsDirty)
+        XCTAssertEqual(session.selectedPresetID, podcast)
+        session.choosePreset(warm)
+        XCTAssertEqual(session.pendingPresetID, warm)
+        XCTAssertEqual(session.settings.bass, 5, "Choosing an overwrite target must preserve the auditioned sound")
+        XCTAssertEqual(session.presets[1].settings.bass, 3, "First click must not save")
+        session.cancelPresetOverwrite()
+        session.choosePreset(podcast)
+        XCTAssertEqual(session.pendingPresetID, podcast)
+        session.settings.air = 2
+        XCTAssertNil(session.pendingPresetID, "Further processing edits cancel confirmation")
+        session.choosePreset(warm)
+        session.settings.monitorGain = -12
+        session.settings.muted = true
+        XCTAssertEqual(session.pendingPresetID, warm, "Monitoring and mute aren't preset edits")
+        session.choosePreset(warm)
+        XCTAssertNil(session.pendingPresetID)
+        XCTAssertFalse(session.presetIsDirty)
+        XCTAssertEqual(session.selectedPresetID, warm)
+        XCTAssertEqual(session.presets[1].settings.bass, 5)
+        XCTAssertEqual(session.presets[1].settings.air, 2)
+        XCTAssertEqual(session.presets[0].settings.bass, 0)
+        let restored = Session(defaults: defaults, listDevices: { [] }, permission: { false }, pollDevices: false)
+        restored.choosePreset(warm)
+        XCTAssertEqual(restored.settings.bass, 5)
+        XCTAssertEqual(restored.settings.air, 2)
+    }
+
+    func testStudioOffPreservesAmountsAndOldPresetsLoad() throws {
+        let old = Data(#"[{"id":"old","name":"Original","settings":{"inputGain":11,"makeup":8,"deEss":30,"reverb":5}}]"#.utf8)
+        let presets = try JSONDecoder().decode([VoicePreset].self, from: old)
+        var voice = presets[0].settings
+        XCTAssertEqual(voice.inputGain, 11)
+        XCTAssertEqual(voice.makeup, 8)
+        XCTAssertTrue(voice.studioEnabled)
+        XCTAssertEqual(voice.controls.deEssAmount, 0.3, accuracy: 0.0001)
+        voice.studioEnabled = false
+        XCTAssertEqual(voice.controls.deEssAmount, 0)
+        XCTAssertEqual(voice.controls.reverbMix, 0)
+        XCTAssertEqual(voice.deEss, 30)
+        XCTAssertEqual(voice.reverb, 5)
+        voice.studioEnabled = true
+        XCTAssertEqual(voice.controls.deEssAmount, 0.3, accuracy: 0.0001)
+        XCTAssertEqual(voice.controls.reverbMix, 0.05, accuracy: 0.0001)
+    }
+
+    @MainActor func testOnboardingCompletionPersistsWithoutStartingAudio() {
+        let suite = "ClearMicTests.\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var permissionRequests = 0
+        func makeSession() -> Session {
+            Session(defaults: defaults, listDevices: { [] }, permission: { permissionRequests += 1; return false }, pollDevices: false)
+        }
+        let session = makeSession()
+        XCTAssertFalse(session.onboardingComplete)
+        session.completeOnboarding()
+        XCTAssertTrue(makeSession().onboardingComplete)
+        XCTAssertEqual(permissionRequests, 0)
+        XCTAssertFalse(session.running)
+    }
+
     @MainActor func testLostSourceReconnectsBySavedUIDWithoutSelectorChanges() async {
         let suite = "ClearMicTests.\(UUID())"
         let defaults = UserDefaults(suiteName: suite)!

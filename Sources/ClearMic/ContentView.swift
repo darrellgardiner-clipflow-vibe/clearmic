@@ -23,158 +23,170 @@ struct ContentView: View {
     @ObservedObject var session: Session
     @State private var savingPreset = false
     @State private var presetName = ""
+    @State private var showingSetup = false
     var body: some View {
         GeometryReader { geometry in
-            let narrow = geometry.size.width < 820
-            let compact = geometry.size.width < 440
+            let narrow = geometry.size.width < 740
+            let padding: CGFloat = geometry.size.width < 440 ? 16 : 28
+            let columns = Array(repeating: GridItem(.flexible(minimum: 99), spacing: 12, alignment: .leading),
+                                count: max(2, min(6, Int((geometry.size.width - padding * 2 + 12) / 124))))
             ScrollView {
-                VStack(spacing: 22) {
-                    (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 20)) : AnyLayout(HStackLayout())) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("clearmic").font(.system(size: 32, weight: .medium, design: .rounded)).tracking(-1.5)
-                            caption("CM–01 / DESKTOP VOICE PROCESSOR")
-                        }
-                        if !narrow { Spacer() }
-                        HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 28) {
+                    HStack(spacing: geometry.size.width < 380 ? 8 : 12) {
                         key("bypass", "arrow.triangle.branch", on: session.settings.bypass, color: Panel.orange) { session.settings.bypass.toggle() }
                         key("mute", "mic.slash", on: session.settings.muted, color: Panel.orange) { session.settings.muted.toggle() }
+                        key("listen", "headphones", on: session.listening, color: Panel.orange) { session.toggleMonitoring() }
+                            .disabled(session.selectedMonitor == nil)
                         key(session.running ? "stop" : "start", session.running ? "stop.fill" : "play.fill", on: session.running, color: Panel.orange) {
                             if session.running { session.stop() } else { Task { await session.start() } }
                         }.disabled(!session.running && !session.canStart)
-                        }
                     }
-                    (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 22)) : AnyLayout(HStackLayout(alignment: .top, spacing: 22))) {
+                    (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 20)) : AnyLayout(HStackLayout(alignment: .top, spacing: 28))) {
                         VStack(alignment: .leading, spacing: 8) {
                             sectionHeader(session.sourceLost ? "01 / SOURCE LOST" : "01 / SOURCE")
-                            HardwareSelector("Microphone", value: session.selectedDevice?.name ?? (session.settings.sourceUID.isEmpty ? "Select microphone" : "Input disconnected"), selection: Binding(get: { session.settings.sourceUID }, set: session.selectSource)) {
-                                Text("Select microphone").tag("")
-                                if !session.settings.sourceUID.isEmpty && session.selectedDevice == nil {
-                                    Text("Saved input disconnected").tag(session.settings.sourceUID)
+                            HStack(spacing: 8) {
+                                HardwareSelector("Microphone", value: session.selectedDevice?.name ?? (session.settings.sourceUID.isEmpty ? "Select microphone" : "Input disconnected"), selection: Binding(get: { session.settings.sourceUID }, set: session.selectSource)) {
+                                    Text("Select microphone").tag("")
+                                    if !session.settings.sourceUID.isEmpty && session.selectedDevice == nil {
+                                        Text("Saved input disconnected").tag(session.settings.sourceUID)
+                                    }
+                                    ForEach(session.devices) { device in
+                                        Text(device.sampleRate == 48000 ? device.name : "\(device.name) (\(Int(device.sampleRate / 1000)) kHz, unsupported)").tag(device.uid)
+                                    }
                                 }
-                                ForEach(session.devices) { device in
-                                    Text(device.sampleRate == 48000 ? device.name : "\(device.name) (\(Int(device.sampleRate / 1000)) kHz, unsupported)").tag(device.uid)
-                                }
-                            }.frame(maxWidth: narrow ? .infinity : 260)
-                            HardwareSelector("Channel", value: "Input \(session.settings.channel + 1)", selection: $session.settings.channel) {
-                                ForEach(0..<max(1, session.selectedDevice?.inputChannels ?? 1), id: \.self) { Text("Input \($0 + 1)").tag($0) }
-                            }.frame(maxWidth: 160)
+                                HardwareSelector("Input channel", value: session.settings.channel == -1 ? "both" : "\(session.settings.channel + 1)", selection: $session.settings.channel, compact: true) {
+                                    ForEach(0..<max(1, session.selectedDevice?.inputChannels ?? 1), id: \.self) { Text("Input \($0 + 1)").tag($0) }
+                                    if (session.selectedDevice?.inputChannels ?? 0) >= 2 { Text("Both · 1 + 2").tag(-1) }
+                                }.frame(width: session.settings.channel == -1 ? 76 : 58)
+                                .help("Choose one input channel, or blend inputs 1 and 2")
+                            }
                             if session.sourceLost {
                                 Button("reconnect") { Task { await session.reconnectSource() } }
                                     .buttonStyle(HardwareButton()).disabled(session.starting)
                             }
-                        }
-                        if !narrow { Divider().frame(height: 65) }
+                        }.frame(maxWidth: .infinity, alignment: .leading)
                         VStack(alignment: .leading, spacing: 8) {
                             sectionHeader("02 / HEADPHONE OUTPUT")
-                            HardwareSelector("Headphone output", value: session.selectedMonitor?.name ?? (session.settings.monitorUID.isEmpty ? "Select headphone output" : "Output disconnected"), selection: $session.settings.monitorUID) {
-                                Text("Select headphone output").tag("")
+                            HardwareSelector("Headphone output", value: session.selectedMonitor?.name ?? (session.settings.monitorUID.isEmpty ? "Select headphones" : "Output disconnected"), selection: $session.settings.monitorUID) {
+                                Text("Select headphones").tag("")
                                 if !session.settings.monitorUID.isEmpty && session.selectedMonitor == nil {
                                     Text("Saved output disconnected").tag(session.settings.monitorUID)
                                 }
                                 ForEach(session.outputs) { Text($0.name).tag($0.uid) }
-                            }.frame(maxWidth: narrow ? .infinity : 260)
-                            Text("Processed voice · use headphones").font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
-                        }
-                        if !narrow { Spacer() }
-                        key("listen", "headphones", on: session.listening, color: Panel.orange) { session.toggleMonitoring() }
-                            .disabled(session.selectedMonitor == nil)
+                            }
+                            HStack(spacing: 10) {
+                                Image(systemName: "headphones").foregroundStyle(Panel.orange)
+                                Text("level").font(.system(size: 11, design: .monospaced))
+                                Slider(value: $session.settings.monitorGain, in: -48...0).frame(minWidth: 50, maxWidth: .infinity).tint(Panel.orange)
+                                    .accessibilityLabel("Headphone listening level").help("Only changes how loudly you hear yourself, not the microphone sent to other apps")
+                                Text(String(format: "%.0f dB", session.settings.monitorGain)).font(.system(size: 11, design: .monospaced)).frame(width: 45, alignment: .trailing)
+                            }
+                        }.frame(maxWidth: .infinity, alignment: .leading)
                     }
                     display(narrow: narrow)
-                    (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 24)) : AnyLayout(HStackLayout(alignment: .top, spacing: 28))) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            sectionHeader("03 / LEVEL & DYNAMICS", toggle: $session.settings.compression)
-                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 99)), count: 2), spacing: 18) {
-                                dial("trim", "INPUT GAIN", $session.settings.inputGain, -12...18, "dB", Panel.ink)
-                                dial("threshold", "COMPRESSOR", $session.settings.threshold, -40...0, "dB", Panel.ink)
-                                dial("ratio", "COMPRESSION", $session.settings.ratio, 1...8, ":1", Panel.ink)
-                                dial("output", "OUTPUT GAIN", $session.settings.makeup, -12...18, "dB", Panel.orange)
-                            }
-                        }.frame(maxWidth: .infinity)
-                        VStack(alignment: .leading, spacing: 12) {
-                            sectionHeader("04 / VOICE EQ", toggle: $session.settings.noiseReduction, toggleLabel: "DENOISE")
-                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 99), spacing: 4), count: compact ? 2 : 3), spacing: 18) {
-                                dial("rumble", "HIGH-PASS", $session.settings.highPass, 0...180, "Hz", Panel.ink)
-                                dial("bass", "120 Hz SHELF", $session.settings.bass, -12...12, "dB", Panel.orange)
-                                dial("body", "280 Hz", $session.settings.mud, -12...6, "dB", Panel.orange)
-                                dial("clarity", "3.5 kHz", $session.settings.presence, -6...9, "dB", Panel.orange)
-                                dial("air", "8 kHz SHELF", $session.settings.air, -12...12, "dB", Panel.orange)
-                            }
-                        }.frame(maxWidth: .infinity)
+                    VStack(alignment: .leading, spacing: 14) {
+                        sectionHeader("03 / LEVEL & DYNAMICS", toggle: $session.settings.compression, toggleLabel: "Dynamics")
+                        LazyVGrid(columns: columns, alignment: .leading, spacing: 18) {
+                            dial("trim", "INPUT GAIN", $session.settings.inputGain, -12...18, "dB", Panel.ink)
+                            dial("threshold", "COMPRESSOR", $session.settings.threshold, -40...0, "dB", Panel.ink)
+                            dial("ratio", "COMPRESSION", $session.settings.ratio, 1...8, ":1", Panel.ink)
+                            dial("output", "OUTPUT GAIN", $session.settings.makeup, -12...18, "dB", Panel.orange)
+                        }
                     }
                     Divider().overlay(Panel.ink.opacity(0.12))
-                    (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12)) : AnyLayout(HStackLayout(alignment: .top, spacing: 24))) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            sectionHeader("05 / STUDIO FINISH")
-                            Text("De-ess softens sharp S sounds. Room adds a short reverb tail. Leave room at zero for a dry podcast or call.")
-                                .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }.frame(maxWidth: .infinity, alignment: .leading)
-                        HStack(spacing: 24) {
-                            dial("de-ess", "SIBILANCE", $session.settings.deEss, 0...100, "%", Panel.orange)
-                            dial("room", "REVERB MIX", $session.settings.reverb, 0...25, "%", Panel.orange)
+                    VStack(alignment: .leading, spacing: 14) {
+                        sectionHeader("04 / VOICE EQ", toggle: $session.settings.noiseReduction, toggleLabel: "Denoise")
+                        LazyVGrid(columns: columns, alignment: .leading, spacing: 18) {
+                            dial("rumble", "HIGH-PASS", $session.settings.highPass, 0...180, "Hz", Panel.ink)
+                            dial("bass", "120 Hz SHELF", $session.settings.bass, -12...12, "dB", Panel.orange)
+                            dial("body", "280 Hz", $session.settings.mud, -12...6, "dB", Panel.orange)
+                            dial("clarity", "3.5 kHz", $session.settings.presence, -6...9, "dB", Panel.orange)
+                            dial("air", "8 kHz SHELF", $session.settings.air, -12...12, "dB", Panel.orange)
                         }
                     }
-                    (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 20)) : AnyLayout(HStackLayout(spacing: 14))) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack(spacing: 14) {
-                                Button("natural") { session.applyNatural() }.buttonStyle(HardwareButton())
-                                Button("flat") { session.applyFlat() }.buttonStyle(HardwareButton())
-                                Button("save…") {
-                                    presetName = session.presets.first(where: { $0.id == session.selectedPresetID })?.name ?? "My voice"
-                                    savingPreset = true
-                                }.buttonStyle(HardwareButton())
+                    Divider().overlay(Panel.ink.opacity(0.12))
+                    VStack(alignment: .leading, spacing: 14) {
+                        sectionHeader("05 / STUDIO FINISH", toggle: $session.settings.studioEnabled, toggleLabel: "Studio finish")
+                        LazyVGrid(columns: columns, alignment: .leading, spacing: 18) {
+                            dial("de-ess", "SIBILANCE", $session.settings.deEss, 0...100, "%", Panel.orange)
+                            dial("room", "REVERB MIX", $session.settings.reverb, 0...25, "%", Panel.orange)
+                        }.disabled(!session.settings.studioEnabled).opacity(session.settings.studioEnabled ? 1 : 0.45)
+                    }
+                    Divider().overlay(Panel.ink.opacity(0.12))
+                    VStack(alignment: .leading, spacing: 16) {
+                        caption("06 / VOICES")
+                        VoiceButtonLayout(spacing: 12) {
+                            Button("natural") { session.applyNatural() }.buttonStyle(HardwareButton())
+                            Button("flat") { session.applyFlat() }.buttonStyle(HardwareButton())
+                            ForEach(session.presets) { preset in
+                                let confirming = session.pendingPresetID == preset.id
+                                let dirty = session.selectedPresetID == preset.id && session.presetIsDirty
+                                Button {
+                                    session.choosePreset(preset.id)
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Text(confirming ? "save over \(preset.name)?" : preset.name).lineLimit(1).truncationMode(.middle)
+                                        if dirty && !confirming { Circle().fill(Panel.orange).frame(width: 5, height: 5).accessibilityHidden(true) }
+                                    }.frame(maxWidth: 240)
+                                }.buttonStyle(HardwareButton(selected: confirming || (session.selectedPresetID == preset.id && !dirty), color: Panel.orange))
+                                .help(confirming ? "Click again to replace this saved voice with your current settings" : dirty ? "Changed. Click to choose this voice as the save target, then click again to confirm" : "Load saved voice")
+                                .accessibilityValue(confirming ? "Confirm overwrite" : dirty ? "Modified" : session.selectedPresetID == preset.id ? "Selected" : "")
                             }
-                            HardwareSelector("Saved voices", value: session.presets.first(where: { $0.id == session.selectedPresetID })?.name ?? "Saved voices", selection: Binding(get: { session.selectedPresetID }, set: session.applyPreset)) {
-                                Text("Choose saved voice").tag("")
-                                ForEach(session.presets) { Text($0.name).tag($0.id) }
-                            }.frame(maxWidth: 260).disabled(session.presets.isEmpty)
+                            Button("save new…") { presetName = "My voice"; savingPreset = true }.buttonStyle(HardwareButton())
                         }
-                        if !narrow { Spacer(minLength: 0) }
-                        HStack {
-                            Image(systemName: "headphones").foregroundStyle(Panel.orange)
-                            Text("listen level").font(.system(size: 11, design: .monospaced))
-                            Slider(value: $session.settings.monitorGain, in: -48...0).frame(minWidth: 50, maxWidth: 135).tint(Panel.orange)
-                            Text(String(format: "%.0f dB", session.settings.monitorGain)).font(.system(size: 11, design: .monospaced)).frame(width: 45)
+                        if session.pendingPresetID != nil {
+                            HStack(spacing: 12) {
+                                Text("Click the voice again to overwrite.").font(.system(size: 11, design: .monospaced))
+                                Button("cancel") { session.cancelPresetOverwrite() }.buttonStyle(HardwareButton())
+                                    .keyboardShortcut(.cancelAction)
+                            }
                         }
                     }
                     if let message = session.message {
-                        HStack(spacing: 10) {
-                            Circle().fill(Panel.orange).frame(width: 7, height: 7)
+                        HStack(alignment: .top, spacing: 10) {
+                            Circle().fill(Panel.orange).frame(width: 7, height: 7).padding(.top, 4)
                             Text(message).font(.system(size: 11, design: .monospaced)).textSelection(.enabled)
                                 .fixedSize(horizontal: false, vertical: true)
-                            Spacer(minLength: 0)
                         }
                     }
-                    (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12)) : AnyLayout(HStackLayout(spacing: 12))) {
-                        caption("LOCAL AUDIO / 48,000 Hz / GPLv3")
-                        if !narrow { Spacer() }
-                        HStack(spacing: 12) {
-                            Circle().fill(session.running ? Panel.orange : Panel.ink.opacity(0.3)).frame(width: 6, height: 6)
-                            caption(session.running
-                                ? session.driverInstalled ? "Connected as \(session.virtualMicName)" : "Monitoring \(session.selectedDevice?.name ?? "microphone")"
-                                : session.driverInstalled ? "\(session.virtualMicName) is off" : "Virtual mic unavailable")
-                            if session.running {
-                                Button("off", systemImage: "power") { session.stop() }.buttonStyle(HardwareButton())
-                                    .help("Stop microphone processing and send silence")
-                            } else if session.driverInstalled {
-                                Button("on", systemImage: "power") { Task { await session.start() } }.buttonStyle(HardwareButton())
-                                    .disabled(!session.canStart)
-                            }
-                        }
-                        if !session.driverInstalled {
-                            Button(session.driverOnDisk ? "load microphone" : "install microphone") {
+                    Divider().overlay(Panel.ink.opacity(0.12))
+                    HStack(spacing: 16) {
+                        Circle().fill(session.running ? Panel.orange : Panel.ink.opacity(0.3)).frame(width: 6, height: 6)
+                        Text(session.running
+                            ? session.driverInstalled ? "Connected as \(session.virtualMicName)" : "Monitoring \(session.selectedDevice?.name ?? "microphone")"
+                            : session.driverInstalled ? "\(session.virtualMicName) is off" : "Virtual mic unavailable")
+                            .font(.system(size: 11, design: .monospaced)).fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 12)
+                        if session.running {
+                            Button("off", systemImage: "power") { session.stop() }.buttonStyle(HardwareButton())
+                                .help("Stop microphone processing and send silence")
+                        } else if session.driverInstalled {
+                            Button("on", systemImage: "power") { Task { await session.start() } }.buttonStyle(HardwareButton()).disabled(!session.canStart)
+                        } else {
+                            Button(session.driverOnDisk ? "load mic" : "install mic") {
                                 if session.driverOnDisk { session.reloadAudioService() } else { session.installDriver() }
                             }.buttonStyle(HardwareButton())
                         }
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                    HStack {
+                        caption("LOCAL AUDIO / 48,000 Hz / GPLv3")
+                        Spacer()
+                        Button { showingSetup = true } label: {
+                            Image(systemName: "questionmark.circle").font(.system(size: 16))
+                        }.buttonStyle(.plain).foregroundStyle(Panel.ink.opacity(0.65))
+                            .accessibilityLabel("Setup and permissions").help("Setup and permissions")
                     }
-
                 }
-                .padding(compact ? 16 : narrow ? 22 : 32)
-                .frame(maxWidth: .infinity)
+                .padding(padding)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .background(LinearGradient(colors: [Panel.surface, Panel.ivory], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea())
         .foregroundStyle(Panel.ink)
+        .onAppear { if !session.onboardingComplete { showingSetup = true } }
+        .sheet(isPresented: $showingSetup) {
+            SetupView(session: session) { session.completeOnboarding(); showingSetup = false }
+        }
         .sheet(isPresented: $savingPreset) {
             VStack(alignment: .leading, spacing: 18) {
                 Text("Save voice preset").font(.title3.weight(.semibold))
@@ -204,14 +216,14 @@ struct ContentView: View {
             caption(title)
             Spacer(minLength: 8)
             if let toggle {
-                if !toggleLabel.isEmpty { caption(toggleLabel) }
+                if toggleLabel == "Denoise" { caption("DENOISE") }
                 Toggle(toggleLabel.isEmpty ? "Compressor" : toggleLabel, isOn: toggle).toggleStyle(HardwareToggle())
             }
         }.frame(height: 29)
     }
 
     private func display(narrow: Bool) -> some View {
-        (narrow ? AnyLayout(VStackLayout(spacing: 20)) : AnyLayout(HStackLayout(spacing: 25))) {
+        (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 20)) : AnyLayout(HStackLayout(spacing: 25))) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text(session.settings.bypass ? "DRY SIGNAL" : "VOICE SHAPING")
@@ -258,11 +270,11 @@ struct ContentView: View {
                 Image(systemName: symbol).font(.system(size: 17))
                 HStack(spacing: 4) {
                     Circle().fill(on ? Color.white : Panel.ink.opacity(0.3)).frame(width: 4, height: 4)
-                    Text(text).font(.system(size: 10, design: .monospaced))
+                    Text(text).font(.system(size: 9, design: .monospaced)).fixedSize()
                 }
             }
-                .frame(width: 55, height: 44)
-        }.buttonStyle(HardwareButton(selected: on, color: color)).accessibilityLabel(text)
+                .frame(width: 44, height: 44)
+        }.buttonStyle(HardwareButton(selected: on, color: color, horizontalPadding: 10)).accessibilityLabel(text)
     }
     private func dial(_ title: String, _ subtitle: String, _ value: Binding<Double>, _ range: ClosedRange<Double>, _ unit: String, _ color: Color) -> some View {
         Dial(title: title, subtitle: subtitle, value: value, range: range, unit: unit, color: color)
@@ -282,8 +294,9 @@ struct ContentView: View {
 private struct HardwareButton: ButtonStyle {
     var selected = false
     var color = Panel.ivory
+    var horizontalPadding: CGFloat = 15
     func makeBody(configuration: Configuration) -> some View {
-        HardwareButtonFace(label: configuration.label, pressed: configuration.isPressed, selected: selected, color: color)
+        HardwareButtonFace(label: configuration.label, pressed: configuration.isPressed, selected: selected, color: color, horizontalPadding: horizontalPadding)
     }
 }
 
@@ -292,12 +305,13 @@ private struct HardwareButtonFace<Label: View>: View {
     let pressed: Bool
     let selected: Bool
     let color: Color
+    let horizontalPadding: CGFloat
     @Environment(\.isEnabled) private var enabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hovered = false
 
     var body: some View {
-        label.padding(.horizontal, 15).padding(.vertical, 12)
+        label.padding(.horizontal, horizontalPadding).padding(.vertical, 12)
             .foregroundStyle(selected ? Color.white : Panel.ink)
             .background {
                 RoundedRectangle(cornerRadius: 11)
@@ -367,7 +381,7 @@ private struct Dial: View {
             Text(String(format: unit == "Hz" ? "%.0f %@" : "%.1f %@", value, unit)).font(.system(size: 13, design: .monospaced))
             Text(title).font(.system(size: 12, weight: .medium))
             Text(subtitle).font(.system(size: 8, design: .monospaced)).foregroundStyle(.secondary)
-        }.frame(width: 99)
+        }.frame(width: 99, alignment: .leading)
     }
 }
 
@@ -448,5 +462,49 @@ private struct LCDGlass: View {
                                endRadius: max(geometry.size.width, geometry.size.height) * 0.65)
             }
         }
+    }
+}
+
+
+struct SetupView: View {
+    @ObservedObject var session: Session
+    let done: () -> Void
+    @State private var page: Int
+    init(session: Session, page: Int = 0, done: @escaping () -> Void) {
+        self.session = session; self.done = done; self._page = State(initialValue: page)
+    }
+    private let titles = ["Choose your microphone", "Connect to recording apps", "Hear your adjustments"]
+    private let symbols = ["mic", "waveform.path", "headphones"]
+    private let explanations = [
+        "Choose your microphone in Source. ClearMic asks for microphone access when you press Start or Listen. Allow it so the app can process your voice.",
+        "The virtual microphone lets other apps receive your processed voice. Installing it requires a separate macOS installer and administrator approval. Loading it may briefly interrupt audio. You can test Listen before installing it.",
+        "Choose headphones under Headphone Output, then turn on Listen. Its level controls only what you hear. Trim and Output control the voice sent to your recording app."
+    ]
+    var body: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            HStack {
+                Text("CLEARMIC SETUP").font(.system(size: 10, weight: .medium, design: .monospaced)).foregroundStyle(.secondary)
+                Spacer()
+                Text("\(page + 1) / 3").font(.system(size: 11, design: .monospaced))
+            }
+            Image(systemName: symbols[page]).font(.system(size: 28)).foregroundStyle(Panel.orange)
+            Text(titles[page]).font(.title2.weight(.medium))
+            Text(explanations[page]).font(.body).fixedSize(horizontal: false, vertical: true)
+            if page == 0 {
+                Text("If access was denied, enable ClearMic in System Settings → Privacy & Security → Microphone.").font(.caption).foregroundStyle(.secondary)
+            } else if page == 1 {
+                Label(session.driverInstalled ? "Virtual microphone is available" : "Install from the main window when you're ready", systemImage: session.driverInstalled ? "checkmark.circle" : "info.circle")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text("Use headphones to avoid feedback. Audio processing stays on this Mac.").font(.caption).foregroundStyle(.secondary)
+            }
+            HStack(spacing: 12) {
+                if page > 0 { Button("back") { page -= 1 }.buttonStyle(HardwareButton()) }
+                Spacer()
+                Button(page == 2 ? "ready" : "next") {
+                    if page == 2 { done() } else { page += 1 }
+                }.buttonStyle(HardwareButton(selected: true, color: Panel.orange)).keyboardShortcut(.defaultAction)
+            }.padding(.top, 6)
+        }.padding(28).frame(width: 360, alignment: .leading).background(Panel.surface).foregroundStyle(Panel.ink)
     }
 }
