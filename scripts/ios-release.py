@@ -129,8 +129,13 @@ class AppStore:
         testers = self.request(f'/v1/betaGroups/{source["id"]}/betaTesters')['data']
         if len(testers) != 1: raise RuntimeError('Expected the existing single-owner Internal group. Confirm intended testers before expanding access.')
         existing = self.request(f'/v1/betaGroups/{group["id"]}/betaTesters')['data']
-        missing = [{'type': 'betaTesters', 'id': t['id']} for t in testers if t['id'] not in {v['id'] for v in existing}]
-        if missing: self.request(f'/v1/betaGroups/{group["id"]}/relationships/betaTesters', 'POST', {'data': missing})
+        existing_emails = {t['attributes']['email'].casefold() for t in existing}
+        for tester in testers:
+            attributes = tester['attributes']
+            if attributes['email'].casefold() not in existing_emails:
+                self.request('/v1/betaTesters', 'POST', {'data': {'type': 'betaTesters',
+                    'attributes': {k: v for k, v in attributes.items() if k in ('email', 'firstName', 'lastName') and v},
+                    'relationships': {'betaGroups': {'data': [{'type': 'betaGroups', 'id': group['id']}]}}}})
         builds = self.request('/v1/builds?' + urllib.parse.urlencode({'filter[app]': app['id'], 'sort': '-uploadedDate', 'limit': 1}))['data']
         if builds:
             build = builds[0]

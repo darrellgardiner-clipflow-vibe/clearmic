@@ -131,6 +131,21 @@ build. Signing/export and the new app record remain separate release steps.
 
 ## TestFlight maintenance
 
+The internal TestFlight app is [clear-mic](https://appstoreconnect.apple.com/apps/6824866849/testflight),
+App Store Connect ID `6824866849`. Version 0.1.0 build 23 was uploaded from the
+mini on 2026-10-20 from commit `cf73f33d7bf051ec379a3ebee4328e3bac0618db`.
+Apple reports `VALID` and `IN_BETA_TESTING`, with the existing owner in the
+Internal group and that build assigned. Accept the TestFlight invitation on an
+iPhone to install. Future uploads to the Internal group are automatically
+available to its tester.
+
+The signed IPA's bundle/version/build, App Store provisioning profile and code
+signature were verified. The app was installed and launched in an iOS 26.5
+simulator and its first screen inspected. All nine RouteCore tests passed;
+the release tooling has five tests, including app-scoped tester creation and
+idempotent setup. This does not verify a physical Bluetooth microphone or
+Camera's recorded input. Follow the device workflow above for that acceptance.
+
 Release settings live in `ios/Release.json`. `scripts/ios-release.py` resolves
 TEAM_ID, ASC_KEY_PATH, ASC_KEY_ID, ASC_ISSUER_ID and CLEARMIC_SIGNING_KEYCHAIN at runtime
 through the existing studio credential library on the mini. It uses an already
@@ -150,10 +165,12 @@ make ios-status            # processing state and internal beta availability
 make ios-enable-testing    # existing owner only, no external review submission
 ```
 
-Create the app record once in App Store Connect with the name ClearMic, bundle
+The App Store Connect record is named `clear-mic`, with bundle
 identifier `flow-labs.clearmic`, SKU `CLEARMIC-IOS` and locale English US. The API
 supports bundle registration, upload and tester management; app-record creation
-uses the signed-in App Store Connect website. These commands do not submit the
+uses the signed-in App Store Connect website. Tester IDs are scoped to each app;
+the release command creates the matching owner by email in the target group rather
+than copying a Link Inbox tester ID. These commands do not submit the
 app for public App Store review or external beta review.
 
 Commit before archiving. Build numbers come from the commit count, and the

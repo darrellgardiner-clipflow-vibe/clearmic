@@ -68,12 +68,35 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(method, 'GET', 'An already assigned build/tester must not be posted again')
             if '/betaGroups' in path and path.endswith('/betaGroups'): return {'data': [group]}
             if path.startswith('/v1/apps?'): return {'data': [{'id': 'source-app'}]}
-            if path.endswith('/betaTesters'): return {'data': [{'id': 'owner'}]}
+            if path.endswith('/betaTesters'): return {'data': [{'id': 'owner-' + path, 'attributes': {'email': 'owner@example.test'}}]}
             if path.startswith('/v1/builds?') or path.endswith('/builds'): return {'data': [{'id': 'build-1'}]}
             if path.endswith('/betaBuildLocalizations'): return {'data': [{'id': 'english'}]}
             raise AssertionError(path)
         store.request = request
         with contextlib.redirect_stdout(io.StringIO()): store.enable_testing()
+
+
+    def test_owner_is_created_for_target_app_instead_of_reusing_source_tester_id(self):
+        store = release.AppStore.__new__(release.AppStore)
+        store.app = lambda: {'id': 'clear-app'}
+        store.status = lambda: None
+        writes = []
+        def request(path, method='GET', data=None):
+            if method == 'POST':
+                writes.append((path, data))
+                return {'data': {'id': 'new-app-owner'}}
+            if path.endswith('/betaGroups'):
+                return {'data': [{'id': 'source' if 'source-app' in path else 'target', 'attributes': {'name': 'Internal', 'isInternalGroup': True}}]}
+            if path.startswith('/v1/apps?'): return {'data': [{'id': 'source-app'}]}
+            if path.endswith('/source/betaTesters'):
+                return {'data': [{'id': 'source-owner', 'attributes': {'email': 'owner@example.test', 'firstName': 'Owner', 'state': 'INSTALLED'}}]}
+            if path.endswith('/target/betaTesters') or path.startswith('/v1/builds?'): return {'data': []}
+            raise AssertionError(path)
+        store.request = request
+        with contextlib.redirect_stdout(io.StringIO()): store.enable_testing()
+        self.assertEqual(writes, [('/v1/betaTesters', {'data': {'type': 'betaTesters',
+            'attributes': {'email': 'owner@example.test', 'firstName': 'Owner'},
+            'relationships': {'betaGroups': {'data': [{'type': 'betaGroups', 'id': 'target'}]}}}})])
 
 
 if __name__ == '__main__': unittest.main()
