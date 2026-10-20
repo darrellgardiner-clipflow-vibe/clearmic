@@ -57,3 +57,20 @@ confirmation and all setup pages. It uses isolated preferences and no real audio
 Run `scripts/check.sh` for preset persistence, permission/lifecycle behavior,
 studio bypass and channel routing. Static renders do not prove keyboard focus,
 menu interaction, VoiceOver or physical audio capture.
+
+## App icon
+
+The icon is an original, broad C ribbon in orange-red on a warm white macOS
+tile. Opposing diagonal terminals give the open letter its deliberate shape;
+generous white space, a continuous tile contour and restrained edge relief
+keep it readable in the Dock. The inset rim is omitted below 64 pixels.
+This asset does not change the controls' existing colours or materials.
+
+`scripts/build-icon.swift` owns the original paths and renders every iconset
+representation directly at its target resolution, from 16 through 1024 pixels.
+The app and HAL driver share the resulting `ClearMic.icns`; no Apple or
+BlackHole artwork is shipped. `scripts/build-driver.sh` generates and packages
+the icon, and `scripts/build-app.sh` copies that same asset into the app.
+Verify with `scripts/check.sh`, then inspect the generated iconset at small and
+large sizes and confirm both bundles contain the same icon. Build success alone
+does not prove how an installed icon appears in Finder or the Dock.
