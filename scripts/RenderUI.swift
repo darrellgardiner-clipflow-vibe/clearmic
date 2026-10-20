@@ -8,7 +8,7 @@ struct RenderUI {
         let destination = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
         for scheme in [ColorScheme.light, .dark] {
-        for (width, height) in [(1080.0, 850.0), (820.0, 1200.0), (600.0, 1600.0), (420.0, 2000.0), (320.0, 2400.0)] {
+        for (width, height) in [(1080.0, 1250.0), (820.0, 1500.0), (600.0, 2100.0), (420.0, 2600.0), (320.0, 3200.0)] {
             let view = ContentView(session: Session.shared).environment(\.colorScheme, scheme).frame(width: width, height: height)
             let host = NSHostingView(rootView: view)
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: height), styleMask: [.borderless], backing: .buffered, defer: false)

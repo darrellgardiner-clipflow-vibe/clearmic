@@ -14,6 +14,115 @@ private final class TestRoute: AudioRouting {
 }
 
 final class SessionTests: XCTestCase {
+    func testNewEQBandsPreserveExistingSettingsAndRoundTrip() throws {
+        let old = Data(#"{"inputGain":11,"makeup":8,"noiseReduction":true}"#.utf8)
+        var settings = VoiceSettings.load(old)
+        XCTAssertEqual(settings.inputGain, 11)
+        XCTAssertEqual(settings.makeup, 8)
+        XCTAssertTrue(settings.noiseReduction)
+        XCTAssertEqual(settings.bass, 0)
+        XCTAssertEqual(settings.air, 0)
+        settings.bass = 3; settings.air = -2
+        let restored = VoiceSettings.load(try JSONEncoder().encode(settings))
+        XCTAssertEqual(restored.bass, 3)
+        XCTAssertEqual(restored.air, -2)
+    }
+
+    @MainActor func testSavedPresetPersistsAndPreservesRoutingAndMute() {
+        let suite = "ClearMicTests.\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        func makeSession() -> Session {
+            Session(defaults: defaults, listDevices: { [] }, permission: { false }, pollDevices: false)
+        }
+        let session = makeSession()
+        session.settings.inputGain = 11; session.settings.makeup = 8
+        session.settings.bass = 3; session.settings.deEss = 35; session.settings.reverb = 5
+        session.savePreset(name: "  Podcast  ")
+        XCTAssertEqual(session.presets.count, 1)
+        XCTAssertEqual(session.presets[0].name, "Podcast")
+        let id = session.presets[0].id
+        session.settings.bass = 4
+        session.savePreset(name: "podcast")
+        XCTAssertEqual(session.presets.count, 1, "Saving the same name should update it")
+        XCTAssertEqual(session.presets[0].id, id)
+        session.savePreset(name: "   ")
+        XCTAssertEqual(session.presets.count, 1)
+        let restored = makeSession()
+        XCTAssertEqual(restored.presets.count, 1)
+        restored.settings.sourceUID = "another-mic"; restored.settings.channel = 1
+        restored.settings.monitorUID = "headphones"; restored.settings.monitorGain = -6
+        restored.settings.muted = true; restored.settings.bypass = true
+        restored.settings.inputGain = 0; restored.settings.bass = 0
+        restored.applyPreset(id)
+        XCTAssertEqual(restored.settings.inputGain, 11)
+        XCTAssertEqual(restored.settings.makeup, 8)
+        XCTAssertEqual(restored.settings.bass, 4)
+        XCTAssertEqual(restored.settings.deEss, 35)
+        XCTAssertEqual(restored.settings.reverb, 5)
+        XCTAssertEqual(restored.settings.sourceUID, "another-mic")
+        XCTAssertEqual(restored.settings.channel, 1)
+        XCTAssertEqual(restored.settings.monitorUID, "headphones")
+        XCTAssertEqual(restored.settings.monitorGain, -6)
+        XCTAssertTrue(restored.settings.muted)
+        XCTAssertTrue(restored.settings.bypass)
+        XCTAssertFalse(restored.running)
+    }
+
+    @MainActor func testLostSourceReconnectsBySavedUIDWithoutSelectorChanges() async {
+        let suite = "ClearMicTests.\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let original = AudioDevice(id: 1, uid: "usb", name: "USB microphone", inputChannels: 2, outputChannels: 0, sampleRate: 48000)
+        let returned = AudioDevice(id: 2, uid: "usb", name: "USB microphone", inputChannels: 2, outputChannels: 0, sampleRate: 48000)
+        var inventory = [original]
+        var routes: [TestRoute] = []
+        let session = Session(defaults: defaults, listDevices: { inventory }, permission: { true }, makeRoute: { source, _, _, _ in
+            let route = TestRoute(source); routes.append(route); return route
+        }, pollDevices: false)
+        session.selectSource("usb")
+        session.settings.channel = 1
+        await session.start()
+        XCTAssertTrue(session.running)
+        inventory = []
+        session.refreshDevices()
+        XCTAssertFalse(session.running)
+        XCTAssertTrue(session.sourceLost)
+        XCTAssertTrue(routes[0].stopped)
+        XCTAssertEqual(session.settings.sourceUID, "usb")
+        await session.reconnectSource()
+        XCTAssertFalse(session.running)
+        XCTAssertTrue(session.sourceLost)
+        XCTAssertEqual(routes.count, 1)
+        inventory = [returned]
+        session.refreshDevices()
+        XCTAssertFalse(session.running, "Replugging must not automatically resume capture")
+        await session.reconnectSource()
+        XCTAssertTrue(session.running)
+        XCTAssertFalse(session.sourceLost)
+        XCTAssertEqual(routes.map(\.sourceID), [1, 2])
+        XCTAssertEqual(session.settings.channel, 1)
+        session.stop()
+    }
+
+    @MainActor func testStalledBuffersOfferReconnectEvenIfDeviceStillEnumerates() async {
+        let suite = "ClearMicTests.\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let device = AudioDevice(id: 1, uid: "usb", name: "USB microphone", inputChannels: 1, outputChannels: 0, sampleRate: 48000)
+        let session = Session(defaults: defaults, listDevices: { [device] }, permission: { true }, makeRoute: { source, _, _, _ in TestRoute(source) }, pollDevices: false)
+        session.selectSource("usb")
+        await session.start()
+        for _ in 0..<31 { session.pollAudio() }
+        XCTAssertFalse(session.running)
+        XCTAssertTrue(session.sourceLost)
+        XCTAssertEqual(session.selectedDevice?.uid, "usb")
+        await session.reconnectSource()
+        XCTAssertTrue(session.running)
+        XCTAssertFalse(session.sourceLost)
+        session.stop()
+    }
+
     @MainActor func testSwitchingActiveSourceResumesAndResetsChannel() async throws {
         let suite = "ClearMicTests.\(UUID())"
         let defaults = UserDefaults(suiteName: suite)!

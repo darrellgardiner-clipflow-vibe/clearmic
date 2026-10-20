@@ -21,11 +21,12 @@ enum Panel {
 
 struct ContentView: View {
     @ObservedObject var session: Session
+    @State private var savingPreset = false
+    @State private var presetName = ""
     var body: some View {
         GeometryReader { geometry in
             let narrow = geometry.size.width < 820
             let compact = geometry.size.width < 440
-            let stacked = geometry.size.width < 900
             ScrollView {
                 VStack(spacing: 22) {
                     (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 20)) : AnyLayout(HStackLayout())) {
@@ -42,9 +43,9 @@ struct ContentView: View {
                         }.disabled(!session.running && !session.canStart)
                         }
                     }
-                    (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 22)) : AnyLayout(HStackLayout(spacing: 22))) {
+                    (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 22)) : AnyLayout(HStackLayout(alignment: .top, spacing: 22))) {
                         VStack(alignment: .leading, spacing: 8) {
-                            caption("01 / SOURCE")
+                            sectionHeader(session.sourceLost ? "01 / SOURCE LOST" : "01 / SOURCE")
                             HardwareSelector("Microphone", value: session.selectedDevice?.name ?? (session.settings.sourceUID.isEmpty ? "Select microphone" : "Input disconnected"), selection: Binding(get: { session.settings.sourceUID }, set: session.selectSource)) {
                                 Text("Select microphone").tag("")
                                 if !session.settings.sourceUID.isEmpty && session.selectedDevice == nil {
@@ -57,10 +58,14 @@ struct ContentView: View {
                             HardwareSelector("Channel", value: "Input \(session.settings.channel + 1)", selection: $session.settings.channel) {
                                 ForEach(0..<max(1, session.selectedDevice?.inputChannels ?? 1), id: \.self) { Text("Input \($0 + 1)").tag($0) }
                             }.frame(maxWidth: 160)
+                            if session.sourceLost {
+                                Button("reconnect") { Task { await session.reconnectSource() } }
+                                    .buttonStyle(HardwareButton()).disabled(session.starting)
+                            }
                         }
                         if !narrow { Divider().frame(height: 65) }
                         VStack(alignment: .leading, spacing: 8) {
-                            caption("02 / HEADPHONE OUTPUT")
+                            sectionHeader("02 / HEADPHONE OUTPUT")
                             HardwareSelector("Headphone output", value: session.selectedMonitor?.name ?? (session.settings.monitorUID.isEmpty ? "Select headphone output" : "Output disconnected"), selection: $session.settings.monitorUID) {
                                 Text("Select headphone output").tag("")
                                 if !session.settings.monitorUID.isEmpty && session.selectedMonitor == nil {
@@ -74,77 +79,135 @@ struct ContentView: View {
                         key("listen", "headphones", on: session.settings.monitoring, color: Panel.orange) { session.settings.monitoring.toggle() }
                             .disabled(session.selectedMonitor == nil)
                     }
-                    HStack {
-                        VStack(alignment: .leading, spacing: 5) {
-                            caption("SPEECH NOISE REDUCTION")
-                            Text("Reduce background noise before output gain")
-                                .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
-                        }
-                        Spacer(minLength: 8)
-                        Toggle("Speech noise reduction", isOn: $session.settings.noiseReduction).toggleStyle(HardwareToggle())
-                    }
                     display(narrow: narrow)
-                    (stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 24)) : AnyLayout(HStackLayout(alignment: .top, spacing: 16))) {
+                    (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 24)) : AnyLayout(HStackLayout(alignment: .top, spacing: 28))) {
                         VStack(alignment: .leading, spacing: 12) {
-                            caption("03 / SHAPE")
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 99), spacing: 4)], spacing: 18) {
-                                dial("trim", "INPUT", $session.settings.inputGain, -12...18, "dB", Panel.ink)
-                                dial("rumble", "HIGH-PASS", $session.settings.highPass, 0...180, "Hz", Panel.ink)
-                                dial("body", "280 Hz", $session.settings.mud, -12...6, "dB", Panel.orange)
-                                dial("clarity", "3.5 kHz", $session.settings.presence, -6...9, "dB", Panel.orange)
-                            }
-                        }
-                        if !stacked { Divider().frame(height: 185) }
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                caption("04 / DYNAMICS")
-                                Spacer()
-                                Toggle("Compressor", isOn: $session.settings.compression).toggleStyle(HardwareToggle())
-                            }
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 99), spacing: 4)], spacing: 18) {
+                            sectionHeader("03 / LEVEL & DYNAMICS", toggle: $session.settings.compression)
+                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 99)), count: 2), spacing: 18) {
+                                dial("trim", "INPUT GAIN", $session.settings.inputGain, -12...18, "dB", Panel.ink)
                                 dial("threshold", "COMPRESSOR", $session.settings.threshold, -40...0, "dB", Panel.ink)
                                 dial("ratio", "COMPRESSION", $session.settings.ratio, 1...8, ":1", Panel.ink)
-                                dial("output", "GAIN", $session.settings.makeup, -12...18, "dB", Panel.orange)
+                                dial("output", "OUTPUT GAIN", $session.settings.makeup, -12...18, "dB", Panel.orange)
                             }
+                        }.frame(maxWidth: .infinity)
+                        VStack(alignment: .leading, spacing: 12) {
+                            sectionHeader("04 / VOICE EQ", toggle: $session.settings.noiseReduction, toggleLabel: "DENOISE")
+                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 99), spacing: 4), count: compact ? 2 : 3), spacing: 18) {
+                                dial("rumble", "HIGH-PASS", $session.settings.highPass, 0...180, "Hz", Panel.ink)
+                                dial("bass", "120 Hz SHELF", $session.settings.bass, -12...12, "dB", Panel.orange)
+                                dial("body", "280 Hz", $session.settings.mud, -12...6, "dB", Panel.orange)
+                                dial("clarity", "3.5 kHz", $session.settings.presence, -6...9, "dB", Panel.orange)
+                                dial("air", "8 kHz SHELF", $session.settings.air, -12...12, "dB", Panel.orange)
+                            }
+                        }.frame(maxWidth: .infinity)
+                    }
+                    Divider().overlay(Panel.ink.opacity(0.12))
+                    (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12)) : AnyLayout(HStackLayout(alignment: .top, spacing: 24))) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            sectionHeader("05 / STUDIO FINISH")
+                            Text("De-ess softens sharp S sounds. Room adds a short reverb tail. Leave room at zero for a dry podcast or call.")
+                                .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                        HStack(spacing: 24) {
+                            dial("de-ess", "SIBILANCE", $session.settings.deEss, 0...100, "%", Panel.orange)
+                            dial("room", "REVERB MIX", $session.settings.reverb, 0...25, "%", Panel.orange)
                         }
                     }
                     (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 20)) : AnyLayout(HStackLayout(spacing: 14))) {
-                        HStack(spacing: 14) {
-                        Button("natural") { session.applyNatural() }.buttonStyle(HardwareButton())
-                        Button("flat") { session.applyFlat() }.buttonStyle(HardwareButton())
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 14) {
+                                Button("natural") { session.applyNatural() }.buttonStyle(HardwareButton())
+                                Button("flat") { session.applyFlat() }.buttonStyle(HardwareButton())
+                                Button("save…") {
+                                    presetName = session.presets.first(where: { $0.id == session.selectedPresetID })?.name ?? "My voice"
+                                    savingPreset = true
+                                }.buttonStyle(HardwareButton())
+                            }
+                            HardwareSelector("Saved voices", value: session.presets.first(where: { $0.id == session.selectedPresetID })?.name ?? "Saved voices", selection: Binding(get: { session.selectedPresetID }, set: session.applyPreset)) {
+                                Text("Choose saved voice").tag("")
+                                ForEach(session.presets) { Text($0.name).tag($0.id) }
+                            }.frame(maxWidth: 260).disabled(session.presets.isEmpty)
                         }
                         if !narrow { Spacer(minLength: 0) }
                         HStack {
-                        Image(systemName: "headphones").foregroundStyle(Panel.orange)
-                        Text("listen level").font(.system(size: 11, design: .monospaced))
-                        Slider(value: $session.settings.monitorGain, in: -48...0).frame(minWidth: 50, maxWidth: 135).tint(Panel.orange)
-                        Text(String(format: "%.0f dB", session.settings.monitorGain)).font(.system(size: 11, design: .monospaced)).frame(width: 45)
+                            Image(systemName: "headphones").foregroundStyle(Panel.orange)
+                            Text("listen level").font(.system(size: 11, design: .monospaced))
+                            Slider(value: $session.settings.monitorGain, in: -48...0).frame(minWidth: 50, maxWidth: 135).tint(Panel.orange)
+                            Text(String(format: "%.0f dB", session.settings.monitorGain)).font(.system(size: 11, design: .monospaced)).frame(width: 45)
                         }
                     }
-                    (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 14)) : AnyLayout(HStackLayout(spacing: 10))) {
+                    if let message = session.message {
                         HStack(spacing: 10) {
-                        Circle().fill(session.running ? Panel.orange : Panel.ink.opacity(0.25)).frame(width: 7, height: 7)
-                        Text(session.message).font(.system(size: 11, design: .monospaced)).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                            Circle().fill(Panel.orange).frame(width: 7, height: 7)
+                            Text(message).font(.system(size: 11, design: .monospaced)).textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 0)
                         }
-                        if !narrow { Spacer(minLength: 0) }
+                    }
+                    (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12)) : AnyLayout(HStackLayout(spacing: 12))) {
+                        caption("LOCAL AUDIO / 48,000 Hz / GPLv3")
+                        if !narrow { Spacer() }
+                        HStack(spacing: 12) {
+                            Circle().fill(session.running ? Panel.orange : Panel.ink.opacity(0.3)).frame(width: 6, height: 6)
+                            caption(session.running
+                                ? session.driverInstalled ? "Connected as \(session.virtualMicName)" : "Monitoring \(session.selectedDevice?.name ?? "microphone")"
+                                : session.driverInstalled ? "\(session.virtualMicName) is off" : "Virtual mic unavailable")
+                            if session.running {
+                                Button("off", systemImage: "power") { session.stop() }.buttonStyle(HardwareButton())
+                                    .help("Stop microphone processing and send silence")
+                            } else if session.driverInstalled {
+                                Button("on", systemImage: "power") { Task { await session.start() } }.buttonStyle(HardwareButton())
+                                    .disabled(!session.canStart)
+                            }
+                        }
                         if !session.driverInstalled {
                             Button(session.driverOnDisk ? "load microphone" : "install microphone") {
                                 if session.driverOnDisk { session.reloadAudioService() } else { session.installDriver() }
                             }.buttonStyle(HardwareButton())
                         }
                     }
-                    (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout())) {
-                        caption("LOCAL AUDIO / 48,000 Hz / GPLv3")
-                        if !narrow { Spacer() }
-                        caption(session.driverInstalled ? "VIRTUAL MIC CONNECTED" : session.driverOnDisk ? "VIRTUAL MIC NEEDS LOADING" : "VIRTUAL MIC NOT INSTALLED")
-                    }
+
                 }
                 .padding(compact ? 16 : narrow ? 22 : 32)
                 .frame(maxWidth: .infinity)
             }
         }
-        .background(LinearGradient(colors: [Panel.capTop, Panel.capBottom], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea())
+        .background(LinearGradient(colors: [Panel.surface, Panel.ivory], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea())
         .foregroundStyle(Panel.ink)
+        .sheet(isPresented: $savingPreset) {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("Save voice preset").font(.title3.weight(.semibold))
+                TextField("Preset name", text: $presetName).textFieldStyle(.plain)
+                    .padding(12).background(RoundedRectangle(cornerRadius: 8).fill(Panel.ivory))
+                    .onSubmit { saveVoice() }
+                Text("Saves processing settings. Your microphone and headphone routing stay as they are. Existing names are updated.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Button("cancel") { savingPreset = false }.buttonStyle(HardwareButton()).keyboardShortcut(.cancelAction)
+                    Spacer()
+                    Button("save") { saveVoice() }.buttonStyle(HardwareButton(selected: true, color: Panel.orange))
+                        .disabled(presetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).keyboardShortcut(.defaultAction)
+                }
+            }.padding(24).frame(width: 310).background(Panel.surface).foregroundStyle(Panel.ink)
+        }
+    }
+
+    private func saveVoice() {
+        guard !presetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        session.savePreset(name: presetName)
+        savingPreset = false
+    }
+
+    private func sectionHeader(_ title: String, toggle: Binding<Bool>? = nil, toggleLabel: String = "") -> some View {
+        HStack {
+            caption(title)
+            Spacer(minLength: 8)
+            if let toggle {
+                if !toggleLabel.isEmpty { caption(toggleLabel) }
+                Toggle(toggleLabel.isEmpty ? "Compressor" : toggleLabel, isOn: toggle).toggleStyle(HardwareToggle())
+            }
+        }.frame(height: 29)
     }
 
     private func display(narrow: Bool) -> some View {
@@ -333,7 +396,19 @@ private struct EQDisplay: View {
             let b1 = -2*cos(w)/a0
             return magnitude((1+alpha*a)/a0, b1, (1-alpha*a)/a0, b1, (1-alpha/a)/a0)
         }
-        var result = bell(280, settings.mud, 0.8) + bell(3500, settings.presence, 0.7)
+        func shelf(_ hz: Double, _ db: Double, high: Bool) -> Double {
+            let a = pow(10, db / 40), w = 2 * Double.pi * hz / 48000
+            let c = cos(w), beta = sqrt(2 * a) * sin(w)
+            if high {
+                let a0 = (a+1) - (a-1)*c + beta
+                return magnitude(a*((a+1)+(a-1)*c+beta)/a0, -2*a*((a-1)+(a+1)*c)/a0,
+                    a*((a+1)+(a-1)*c-beta)/a0, 2*((a-1)-(a+1)*c)/a0, ((a+1)-(a-1)*c-beta)/a0)
+            }
+            let a0 = (a+1) + (a-1)*c + beta
+            return magnitude(a*((a+1)-(a-1)*c+beta)/a0, 2*a*((a-1)-(a+1)*c)/a0,
+                a*((a+1)-(a-1)*c-beta)/a0, -2*((a-1)+(a+1)*c)/a0, ((a+1)+(a-1)*c-beta)/a0)
+        }
+        var result = shelf(120, settings.bass, high: false) + bell(280, settings.mud, 0.8) + bell(3500, settings.presence, 0.7) + shelf(8000, settings.air, high: true)
         if settings.highPass > 0 {
             let w = 2 * Double.pi * settings.highPass / 48000, c = cos(w), alpha = sin(w)/sqrt(2), a0 = 1+alpha
             let b0 = (1+c)/(2*a0)

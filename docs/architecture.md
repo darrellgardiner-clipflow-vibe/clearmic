@@ -112,3 +112,39 @@ after the audio callback has stopped. Neither the render loop nor the model
 frame-processing call performs file access, allocation, logging or locking.
 The bundled source/model provenance and compatibility shim are documented
 in vendor/RNNoise/PROVENANCE.md.
+
+## Bass and air shelves
+
+The 120 Hz bass and 8 kHz air filters use RBJ biquad shelves with slope 1.
+They share the existing coefficient ramps, control snapshot and limiter.
+New atomic values occupy slots 8/9 and are bounded to ±12 dB before entering
+the snapshot. The UI computes the same shelf response for its LCD curve.
+Legacy saved settings merge the new bands at 0 dB without changing input
+trim, makeup gain or cleanup. Both shelves are flat in Natural and Flat.
+
+## Studio finish and preset ownership
+
+The split-band de-esser follows EQ and precedes compression. A 4.5 kHz
+one-pole split feeds a fast-attack/60 ms release high-band detector, with
+up to 9 dB high-band reduction scaled by the amount control. Gain changes
+use the existing smoothing coefficient. It is a simple de-esser, not a
+trained sibilance classifier.
+
+A fixed-buffer Schroeder room follows compression and precedes output
+gain/the limiter. Four damped parallel combs feed two allpass diffusers.
+The wet mix is bounded to 25% and smoothed. Delay buffers are allocated as
+part of the processor before I/O. Mute clears the room once and prevents
+new muted speech entering it. Bypass remains dry. No effect allocates,
+locks or logs in the callback.
+
+VoicePreset owns a named processing snapshot. VoiceSettings.presetSettings
+strips routing, listening level, mute and bypass before serialization.
+Session owns save/replace/load in its injected UserDefaults. Applying a
+preset preserves those session controls, then updates the current route
+through the existing coherent atomic controls snapshot.
+
+Source loss is session state independent of device enumeration. Both a
+disappearing/changing active input and a stalled callback counter stop the
+route and set sourceLost. Reconnect refreshes enumeration and starts only
+the saved UID; successful route creation clears the state. Returning device
+IDs can differ, and replugging alone never starts capture.

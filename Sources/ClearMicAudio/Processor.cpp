@@ -47,6 +47,25 @@ struct Biquad {
         const double b0 = (1 + c) / (2 * a0);
         set(b0, -(1 + c) / a0, b0, -2 * c / a0, (1 - alpha) / a0);
     }
+    void shelf(double rate, float hz, float gainDB, bool high) {
+        const double a = std::pow(10.0, gainDB / 40.0), w = 2 * pi * hz / rate;
+        const double c = std::cos(w), beta = std::sqrt(2 * a) * std::sin(w);
+        if (high) {
+            const double a0 = (a + 1) - (a - 1) * c + beta;
+            set(a * ((a + 1) + (a - 1) * c + beta) / a0,
+                -2 * a * ((a - 1) + (a + 1) * c) / a0,
+                a * ((a + 1) + (a - 1) * c - beta) / a0,
+                2 * ((a - 1) - (a + 1) * c) / a0,
+                ((a + 1) - (a - 1) * c - beta) / a0);
+        } else {
+            const double a0 = (a + 1) + (a - 1) * c + beta;
+            set(a * ((a + 1) - (a - 1) * c + beta) / a0,
+                2 * a * ((a - 1) - (a + 1) * c) / a0,
+                a * ((a + 1) - (a - 1) * c - beta) / a0,
+                -2 * ((a - 1) + (a + 1) * c) / a0,
+                ((a + 1) + (a - 1) * c - beta) / a0);
+        }
+    }
     void bell(double rate, float hz, float gainDB, float q) {
         const double a = std::pow(10.0, gainDB / 40.0), w = 2 * pi * hz / rate;
         const double alpha = std::sin(w) / (2 * q), a0 = 1 + alpha / a;
@@ -54,17 +73,62 @@ struct Biquad {
         set((1 + alpha * a) / a0, b1, (1 - alpha * a) / a0, b1, (1 - alpha / a) / a0);
     }
 };
+
+struct RoomReverb {
+    struct Comb {
+        std::array<float, 4096> samples{};
+        uint32_t position = 0, length = 1;
+        float damped = 0;
+        float process(float input) {
+            const float delayed = samples[position];
+            damped = 0.6f * damped + 0.4f * delayed;
+            samples[position] = input + 0.68f * damped;
+            if (++position == length) position = 0;
+            return delayed;
+        }
+        void clear() { samples.fill(0); damped = 0; }
+    };
+    struct Allpass {
+        std::array<float, 2048> samples{};
+        uint32_t position = 0, length = 1;
+        float process(float input) {
+            const float delayed = samples[position];
+            samples[position] = input + 0.5f * delayed;
+            if (++position == length) position = 0;
+            return delayed - 0.5f * input;
+        }
+        void clear() { samples.fill(0); }
+    };
+    std::array<Comb, 4> combs;
+    std::array<Allpass, 2> diffusers;
+    explicit RoomReverb(double rate) {
+        constexpr std::array<double, 4> delays{0.0297, 0.0371, 0.0411, 0.0437};
+        for (size_t i = 0; i < combs.size(); ++i) combs[i].length = std::clamp(uint32_t(rate * delays[i]), 1u, 4096u);
+        diffusers[0].length = std::clamp(uint32_t(rate * 0.005), 1u, 2048u);
+        diffusers[1].length = std::clamp(uint32_t(rate * 0.0017), 1u, 2048u);
+    }
+    float process(float input) {
+        float result = 0;
+        for (auto &comb : combs) result += comb.process(input) * 0.25f;
+        return diffusers[1].process(diffusers[0].process(result));
+    }
+    void clear() { for (auto &comb : combs) comb.clear(); for (auto &diffuser : diffusers) diffuser.clear(); }
+};
+
 }
 
 struct CMProcessor {
     const double rate;
-    std::array<std::atomic<float>, 8> parameters;
+    std::array<std::atomic<float>, 12> parameters;
     std::atomic<uint32_t> flags{0}, sequence{0};
     uint32_t appliedSequence = UINT32_MAX;
     CMControls controls = CMDefaultControls();
     uint32_t inputChannel = 0, outputOffset = 0;
     uint32_t monitorOffset = UINT32_MAX, monitorChannels = 0;
-    Biquad highPass, mud, presence;
+    Biquad highPass, bass, mud, presence, air;
+    RoomReverb room;
+    float deEssLow = 0, deEssEnvelope = 0, deEssGain = 1, roomMix = 0;
+    const float deEssSplit, deEssAttack, deEssRelease;
     DenoiseState *denoiser = nullptr;
     std::array<float, 480> noiseInput{}, noiseOutput{};
     uint32_t noisePosition = 0;
@@ -91,7 +155,11 @@ struct CMProcessor {
     std::array<float, maxFrames> scratch{};
 
     explicit CMProcessor(double sampleRate)
-        : rate(sampleRate), gainSmoothing(std::exp(-1.0 / (0.005 * sampleRate))),
+        : rate(sampleRate), room(sampleRate),
+          deEssSplit(std::exp(float(-2 * pi * 4500 / sampleRate))),
+          deEssAttack(std::exp(float(-1 / (0.001 * sampleRate)))),
+          deEssRelease(std::exp(float(-1 / (0.060 * sampleRate)))),
+          gainSmoothing(std::exp(-1.0 / (0.005 * sampleRate))),
           attack(std::exp(-1.0 / (0.010 * sampleRate))),
           release(std::exp(-1.0 / (0.120 * sampleRate))),
           limiterRelease(std::exp(-1.0 / (0.050 * sampleRate))) {}
@@ -108,6 +176,10 @@ struct CMProcessor {
         next.ratio = parameters[5].load();
         next.makeupDB = parameters[6].load();
         next.monitorGainDB = parameters[7].load();
+        next.bassGainDB = parameters[8].load();
+        next.airGainDB = parameters[9].load();
+        next.deEssAmount = parameters[10].load();
+        next.reverbMix = parameters[11].load();
         const uint32_t bits = flags.load();
         next.noiseReductionEnabled = (bits >> 3) & 1;
         next.bypass = bits & 1; next.muted = (bits >> 1) & 1; next.compressionEnabled = (bits >> 2) & 1;
@@ -127,11 +199,14 @@ struct CMProcessor {
                 muteRemaining = 240; muteStep = ((next.muted ? 0.0f : 1.0f) - muteGain) / 240;
             }
         }
+        if (next.muted && !controls.muted) room.clear();
         controls = next; appliedSequence = before;
         highPass.highPass(rate, controls.highPassHz);
+        bass.shelf(rate, 120, controls.bassGainDB, false);
+        air.shelf(rate, 8000, controls.airGainDB, true);
         mud.bell(rate, 280, controls.mudGainDB, 0.8);
         presence.bell(rate, 3500, controls.presenceGainDB, 0.7);
-        if (first) { highPass.snap(); mud.snap(); presence.snap(); }
+        if (first) { highPass.snap(); bass.snap(); mud.snap(); presence.snap(); air.snap(); }
     }
 
     void process(float *samples, uint32_t count) {
@@ -151,13 +226,23 @@ struct CMProcessor {
             const float mixTarget = cleaning ? 1.0f : 0.0f;
             noiseMix += std::clamp(mixTarget - noiseMix, -1.0f / 2400, 1.0f / 2400);
             value = value * (1 - noiseMix) + cleaned * noiseMix;
-            value = presence.process(mud.process(highPass.process(value)));
+            value = air.process(presence.process(mud.process(bass.process(highPass.process(value)))));
+            deEssLow = deEssSplit * deEssLow + (1 - deEssSplit) * value;
+            const float sibilance = value - deEssLow;
+            const float deEssSpeed = std::abs(sibilance) > deEssEnvelope ? deEssAttack : deEssRelease;
+            deEssEnvelope = deEssSpeed * deEssEnvelope + (1 - deEssSpeed) * std::abs(sibilance);
+            const float deEssTarget = amplitude(-std::min(9.0f, std::max(0.0f, decibels(deEssEnvelope) + 32) * 0.75f) * controls.deEssAmount);
+            deEssGain = gainSmoothing * deEssGain + (1 - gainSmoothing) * deEssTarget;
+            if (controls.deEssAmount > 0) value = deEssLow + sibilance * deEssGain;
             const float over = std::max(0.0f, decibels(std::abs(value)) - controls.thresholdDB);
             const float targetReduction = controls.compressionEnabled ? over * (1 - 1 / controls.ratio) : 0;
             const float smoothing = targetReduction > reduction ? attack : release;
             reduction = smoothing * reduction + (1 - smoothing) * targetReduction;
             maxReduction = std::max(maxReduction, reduction);
-            value *= amplitude(-reduction) * makeup;
+            value *= amplitude(-reduction);
+            roomMix = gainSmoothing * roomMix + (1 - gainSmoothing) * controls.reverbMix;
+            const float roomValue = room.process(controls.muted ? 0 : value);
+            value = (value * (1 - roomMix) + roomValue * roomMix) * makeup;
             const float desiredLimit = std::min(1.0f, ceiling / std::max(std::abs(value), 0.000001f));
             limiter = desiredLimit < limiter ? desiredLimit : limiterRelease * limiter + (1 - limiterRelease) * desiredLimit;
             value *= limiter;
@@ -180,7 +265,7 @@ struct CMProcessor {
     }
 };
 
-CMControls CMDefaultControls(void) { return {0, 80, -3, 2, -18, 3, 0, 0, 0, 1, -18, 0}; }
+CMControls CMDefaultControls(void) { return {0, 80, -3, 2, -18, 3, 0, 0, 0, 1, -18, 0, 0, 0, 0, 0}; }
 
 CMProcessor *CMProcessorCreate(double rate) {
     if (!std::isfinite(rate) || rate < 8000 || rate > 192000) return nullptr;
@@ -196,11 +281,13 @@ void CMProcessorDestroy(CMProcessor *p) { delete p; }
 
 void CMProcessorSetControls(CMProcessor *p, CMControls c) {
     if (!p) return;
-    const std::array<float, 8> values = {
+    const std::array<float, 12> values = {
         bounded(c.inputGainDB, -24, 24, 0), bounded(c.highPassHz, 0, 200, 80),
         bounded(c.mudGainDB, -12, 6, 0), bounded(c.presenceGainDB, -6, 9, 0),
         bounded(c.thresholdDB, -48, 0, -18), bounded(c.ratio, 1, 8, 3), bounded(c.makeupDB, -12, 18, 0),
-        bounded(c.monitorGainDB, -60, 0, -18)
+        bounded(c.monitorGainDB, -60, 0, -18),
+        bounded(c.bassGainDB, -12, 12, 0), bounded(c.airGainDB, -12, 12, 0),
+        bounded(c.deEssAmount, 0, 1, 0), bounded(c.reverbMix, 0, 0.25f, 0)
     };
     p->sequence.fetch_add(1);
     for (size_t i = 0; i < values.size(); ++i) p->parameters[i].store(values[i]);

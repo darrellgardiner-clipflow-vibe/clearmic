@@ -140,3 +140,49 @@ start, enable Speech Noise Reduction, then compare on/off at unchanged trim
 and output settings. Speak normally, pause, and test consonants and breaths.
 Check both headphone playback and Riverside recording before accepting the
 voice quality and latency. A virtual driver reinstall is not required.
+
+## Bass and air EQ, 0.1.7
+
+Twenty-two tests pass. Shelf tests exercise boosts and cuts at the low/high
+passbands, the half-gain corner frequencies, and the unaffected opposite
+frequency range. A settings round-trip test proves existing 11 dB input
+trim, 8 dB output and enabled cleanup survive migration with flat new bands.
+Native light/dark layouts are rendered from 320 to 1080 points.
+Actual voice preference and listening quality remain a live user check.
+
+## Reorganized controls, saved voices and studio finish, 0.1.7
+
+Twenty-eight tests pass. Additional checks cover split-band high-frequency
+attenuation with low-frequency retention, a finite reverb tail that decays,
+dry bypass/mute with reverb, and save/overwrite/reload of a named preset
+while preserving source, channel, headphone route/level, mute and bypass.
+These include actual sample processing and isolated preferences, not UI
+state-only assertions. The light/dark native renders cover 320–1080 points.
+
+The save dialog, opened menus, VoiceOver and subjective de-essing/reverb
+quality remain live user checks. No claim is made that effects alone make
+a voice studio-quality. After update, save the existing baseline, then
+compare small de-ess amounts and optionally a low room mix while listening.
+
+The mute transition test also verifies that speech received while muted
+cannot return in a reverb tail after unmuting. With noise cleanup, bass/air,
+de-essing and room mix enabled, five release CPU checks processed all frames
+with finite, bounded, nonzero output. Block medians were 0.272–0.273 ms,
+p99 0.354–0.373 ms, and maxima 0.396–1.502 ms for 10 ms blocks on this Mac.
+This excludes live Core Audio/Bluetooth scheduling and is not a latency
+or dropout guarantee.
+
+Reconnect tests remove the active device from an injected inventory, verify
+Source Lost and teardown, try reconnection while absent, then return the same
+UID with a new device ID and resume via Reconnect without selector changes.
+A separate case keeps the device listed but stalls frame counts; the stream
+watchdog also enters Source Lost and permits a fresh route. Both tests use
+isolated route boundaries and do not unplug the user's actual microphone.
+Denoise is now in the Voice EQ heading; its DSP order is unchanged.
+
+The footer reads Connected as the enumerated virtual microphone name only
+while processing is running. Its Off action uses the tested stop path; On
+uses the existing start path. Normal instructional status strings are no
+longer emitted. Optional messages now contain errors or setup/source-loss
+information and appear only when present. The footer actions still require
+a live UI check.

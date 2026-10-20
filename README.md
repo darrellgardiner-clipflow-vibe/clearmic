@@ -11,7 +11,7 @@ Hardware/browser validation and long-session testing are still required.
 ## What it does
 
 - Select one hardware input channel and send it equally to both virtual channels.
-- Apply input trim, offline speech noise reduction, a high-pass filter, low-mid EQ, presence EQ, compression,
+- Apply input trim, offline speech noise reduction, a high-pass filter, bass/air shelves, low-mid EQ, presence EQ, compression,
   output gain, and a −1 dBFS limiter.
 - Compare with the raw signal using Bypass, or silence the output using Mute.
 - Show live input/output peaks, compressor gain reduction and an EQ display.
@@ -152,3 +152,42 @@ consonants and voice texture and cannot remove all room echo or background speec
 The bundled model runs while processing to keep comparisons responsive. Stop
 processing to release the audio route and denoiser. Third-party notices are
 in vendor/RNNoise and the application resources.
+
+## Voice EQ
+
+Bass is a 120 Hz low shelf for adding warmth or reducing boom. Body adjusts
+280 Hz, Clarity adjusts 3.5 kHz, and Air is an 8 kHz high shelf for brightness.
+Bass and Air each range from −12 to +12 dB; both default to zero and preserve
+existing gain and noise-reduction settings when updating. Start with small
+changes, such as +3 dB Bass, and compare at a similar listening volume.
+The LCD curve includes all four bands and the rumble high-pass filter.
+
+## Level, EQ and studio finish
+
+Level & Dynamics groups input trim, compressor threshold/ratio and output
+gain. Voice EQ groups the rumble high-pass, bass, body, clarity and air bands.
+The source and headphone selectors align at the top, and both processing
+sections share a fixed header height.
+
+Studio Finish adds optional split-band de-essing to soften sharp S sounds
+and a short diffuse mono room reverb. Both start at zero. For podcasts and
+calls, a dry voice is the default; use reverb sparingly when desired. These
+controls do not repair clipping, room echo or poor microphone placement.
+
+Choose Save, enter a name, then select that voice from Saved voices to recall
+it. Saving the same name updates it. Presets persist locally and contain only
+processing settings; loading one keeps the current microphone, channel,
+headphone output/level, mute and bypass. Save your current sound before
+trying Natural or Flat.
+
+Denoise lives in the Voice EQ header alongside its On/Off switch. Its signal
+position remains before EQ; the UI groups the control for convenience.
+If the saved source disconnects or stops delivering buffers, Source Lost
+and Reconnect appear. Replug the same microphone and choose Reconnect to
+reopen it, including when Core Audio assigns a different device ID. Capture
+does not resume merely from replugging and never switches to another mic.
+
+The footer shows Connected as the published virtual microphone name while
+processing is active, with Off to stop sending audio. On starts it again.
+Normal connection guidance is not repeated in a separate status row;
+source-loss and error messages remain visible when needed.

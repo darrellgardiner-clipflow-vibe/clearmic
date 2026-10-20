@@ -12,6 +12,8 @@ int main() {
         if (!processor) return 1;
         auto controls = CMDefaultControls();
         controls.noiseReductionEnabled = 1;
+        controls.bassGainDB = 3; controls.airGainDB = 2;
+        controls.deEssAmount = 0.5; controls.reverbMix = 0.1;
         CMProcessorSetControls(processor, controls);
         std::vector<double> times;
         times.reserve(1000);

@@ -2,6 +2,7 @@ import AVFoundation
 import AppKit
 import ClearMicAudio
 import Combine
+import CoreAudio
 import Foundation
 import OSLog
 
@@ -10,11 +11,15 @@ struct VoiceSettings: Codable, Equatable {
     var channel = 0
     var inputGain = 0.0
     var highPass = 80.0
+    var bass = 0.0
+    var air = 0.0
     var mud = -3.0
     var presence = 2.0
     var threshold = -18.0
     var ratio = 3.0
     var makeup = 0.0
+    var deEss = 0.0
+    var reverb = 0.0
     var noiseReduction = true
     var compression = true
     var bypass = false
@@ -27,7 +32,15 @@ struct VoiceSettings: Codable, Equatable {
         CMControls(inputGainDB: Float(inputGain), highPassHz: Float(highPass), mudGainDB: Float(mud),
                    presenceGainDB: Float(presence), thresholdDB: Float(threshold), ratio: Float(ratio),
                    makeupDB: Float(makeup), bypass: bypass ? 1 : 0, muted: muted ? 1 : 0,
-                   compressionEnabled: compression ? 1 : 0, monitorGainDB: Float(monitorGain), noiseReductionEnabled: noiseReduction ? 1 : 0)
+                   compressionEnabled: compression ? 1 : 0, monitorGainDB: Float(monitorGain), noiseReductionEnabled: noiseReduction ? 1 : 0, bassGainDB: Float(bass), airGainDB: Float(air), deEssAmount: Float(deEss / 100), reverbMix: Float(reverb / 100))
+    }
+
+    var presetSettings: VoiceSettings {
+        var value = self
+        value.sourceUID = ""; value.channel = 0
+        value.monitorUID = ""; value.monitoring = false; value.monitorGain = -18
+        value.bypass = false; value.muted = false
+        return value
     }
 
     static func load(_ data: Data?) -> VoiceSettings {
@@ -43,11 +56,18 @@ struct VoiceSettings: Codable, Equatable {
     }
 }
 
+struct VoicePreset: Codable, Identifiable {
+    let id: String
+    var name: String
+    var settings: VoiceSettings
+}
+
 @MainActor
 final class Session: ObservableObject {
     static let shared = Session()
     @Published var settings: VoiceSettings {
         didSet {
+            if oldValue.presetSettings != settings.presetSettings { selectedPresetID = "" }
             if let encoded = try? JSONEncoder().encode(settings) { defaults.set(encoded, forKey: "voiceSettings") }
             let inputChanged = oldValue.sourceUID != settings.sourceUID || oldValue.channel != settings.channel
             let outputChanged = oldValue.monitorUID != settings.monitorUID || oldValue.monitoring != settings.monitoring
@@ -66,13 +86,17 @@ final class Session: ObservableObject {
             } else { route?.update(settings.controls) }
         }
     }
+    @Published private(set) var presets: [VoicePreset] = []
+    @Published private(set) var selectedPresetID = ""
     @Published private(set) var devices: [AudioDevice] = []
     @Published private(set) var outputs: [AudioDevice] = []
     @Published private(set) var running = false
     @Published private(set) var starting = false
+    @Published private(set) var sourceLost = false
     @Published private(set) var driverInstalled = false
     @Published private(set) var driverOnDisk = false
-    @Published private(set) var message = "Choose your microphone, then start processing."
+    @Published private(set) var message: String?
+    @Published private(set) var virtualMicName = "ClearMic"
     @Published private(set) var inputDB: Float = -120
     @Published private(set) var outputDB: Float = -120
     @Published private(set) var reductionDB: Float = 0
@@ -105,10 +129,14 @@ final class Session: ObservableObject {
         self.permission = permission
         self.makeRoute = makeRoute
         settings = VoiceSettings.load(defaults.data(forKey: "voiceSettings"))
+        if let data = defaults.data(forKey: "voicePresets"),
+           let stored = try? JSONDecoder().decode([VoicePreset].self, from: data) {
+            presets = stored
+        }
         refreshDevices()
         if pollDevices {
             timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-                Task { @MainActor in self?.tick() }
+                Task { @MainActor in self?.pollAudio() }
             }
         }
     }
@@ -122,6 +150,7 @@ final class Session: ObservableObject {
     }
 
     func refreshDevices() {
+        let previousSourceName = selectedDevice?.name ?? "Selected microphone"
         let all = listDevices()
         let listed = all.filter {
             $0.inputChannels > 0 && $0.uid != AudioHardware.microphoneUID && !$0.uid.hasPrefix("org.clearmic.route.")
@@ -129,17 +158,36 @@ final class Session: ObservableObject {
         if listed != devices { devices = listed }
         let destinations = all.filter { $0.outputChannels > 0 && !$0.uid.hasPrefix("org.clearmic.route.") && $0.uid != AudioHardware.sendUID }
         if outputs != destinations { outputs = destinations }
-        driverInstalled = AudioHardware.resolve(AudioHardware.microphoneUID) != nil && AudioHardware.resolve(AudioHardware.sendUID) != nil
+        let virtualInput = AudioHardware.resolve(AudioHardware.microphoneUID)
+        driverInstalled = virtualInput != nil && AudioHardware.resolve(AudioHardware.sendUID) != nil
+        if let virtualInput, let name = AudioHardware.string(virtualInput, kAudioObjectPropertyName) { virtualMicName = name }
         driverOnDisk = FileManager.default.fileExists(atPath: "/Library/Audio/Plug-Ins/HAL/ClearMic.driver")
-        if running, selectedDevice?.id != route?.sourceID || selectedDevice?.sampleRate != 48000 ||
-            (settings.monitoring && selectedMonitor?.id != route?.monitorID) {
-            stop()
-            message = "The audio device changed or disconnected. Check your input and start again."
+        if running {
+            let sourceChanged = selectedDevice?.id != route?.sourceID || selectedDevice?.sampleRate != 48000
+            let monitorChanged = settings.monitoring && selectedMonitor?.id != route?.monitorID
+            if sourceChanged || monitorChanged {
+                stop()
+                sourceLost = sourceChanged
+                message = sourceChanged
+                    ? "Source lost: \(previousSourceName). Reconnect the microphone, then choose Reconnect."
+                    : "Headphone output disconnected. Choose an available output and start again."
+            }
         }
+    }
+
+    func reconnectSource() async {
+        refreshDevices()
+        guard selectedDevice != nil else {
+            sourceLost = true
+            message = "Source is still unavailable. Reconnect the saved microphone and try again, or choose another source."
+            return
+        }
+        await start()
     }
 
     func selectSource(_ uid: String) {
         guard settings.sourceUID != uid else { return }
+        sourceLost = false
         var next = settings
         next.sourceUID = uid
         next.channel = 0
@@ -158,13 +206,18 @@ final class Session: ObservableObject {
             return
         }
         refreshDevices()
-        guard let source = selectedDevice else { message = "Choose an available microphone first."; return }
+        guard let source = selectedDevice else {
+            sourceLost = !settings.sourceUID.isEmpty
+            message = sourceLost ? "Source lost. Reconnect the saved microphone, then choose Reconnect." : "Choose an available microphone first."
+            return
+        }
         do {
             if settings.monitoring && selectedMonitor == nil { throw RouteError("Choose your headphone output first.") }
             route = try makeRoute(source, settings.channel, settings.monitoring ? selectedMonitor : nil, settings.controls)
             running = true
+            sourceLost = false
             lastFrameCount = 0; stalledTicks = 0
-            message = driverInstalled ? "Select ClearMic as the microphone in Riverside or your call app." : settings.monitoring ? "Listening to processed voice. Install the virtual mic for Riverside." : "Input is active. Turn on Listen to hear your voice, or install the virtual mic for Riverside."
+            message = nil
             logger.notice("Audio capture started; monitoring=\(self.listening), virtualMic=\(self.driverInstalled)")
         } catch {
             message = error.localizedDescription
@@ -179,7 +232,7 @@ final class Session: ObservableObject {
         route?.stop(); route = nil
         running = false
         inputDB = -120; outputDB = -120; reductionDB = 0
-        message = "Processing is stopped. ClearMic sends silence."
+        message = nil
     }
 
     func installDriver() {
@@ -208,7 +261,7 @@ final class Session: ObservableObject {
                     self.refreshDevices()
                     if process.terminationStatus == 0 {
                         self.message = self.driverInstalled
-                            ? "Virtual microphone loaded. Choose your input and start processing."
+                            ? nil
                             : "Audio restart requested. Wait a few seconds, then Start. If ClearMic stays unavailable, restart your Mac once."
                     } else {
                         self.message = "Audio reload did not complete. Restart your Mac once to load the installed microphone. No reinstall or security changes are needed. \(detail)"
@@ -218,6 +271,31 @@ final class Session: ObservableObject {
                 await MainActor.run { self.message = error.localizedDescription }
             }
         }
+    }
+
+    func savePreset(name: String) {
+        let name = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(60))
+        guard !name.isEmpty else { return }
+        if let index = presets.firstIndex(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
+            presets[index].settings = settings.presetSettings
+            selectedPresetID = presets[index].id
+        } else {
+            let preset = VoicePreset(id: UUID().uuidString, name: name, settings: settings.presetSettings)
+            presets.append(preset)
+            selectedPresetID = preset.id
+        }
+        if let data = try? JSONEncoder().encode(presets) { defaults.set(data, forKey: "voicePresets") }
+    }
+
+    func applyPreset(_ id: String) {
+        guard let preset = presets.first(where: { $0.id == id }) else { return }
+        var next = preset.settings
+        next.sourceUID = settings.sourceUID; next.channel = settings.channel
+        next.monitorUID = settings.monitorUID; next.monitoring = settings.monitoring
+        next.monitorGain = settings.monitorGain
+        next.bypass = settings.bypass; next.muted = settings.muted
+        settings = next
+        selectedPresetID = id
     }
 
     func applyNatural() {
@@ -230,13 +308,15 @@ final class Session: ObservableObject {
 
     func applyFlat() {
         var preset = settings
+        preset.deEss = 0; preset.reverb = 0
+        preset.bass = 0; preset.air = 0
         preset.inputGain = 0; preset.highPass = 0; preset.mud = 0; preset.presence = 0
         preset.noiseReduction = false
         preset.compression = false; preset.makeup = 0; preset.bypass = false
         settings = preset
     }
 
-    private func tick() {
+    func pollAudio() {
         ticks += 1
         if ticks % 20 == 0 { refreshDevices() }
         if let values = route?.meters() {
@@ -248,7 +328,8 @@ final class Session: ObservableObject {
             lastFrameCount = values.processedFrames
             if stalledTicks > 30 {
                 stop()
-                message = "The audio stream stopped delivering valid buffers. Check the interface and start again."
+                sourceLost = true
+                message = "Source stream lost. Choose Reconnect to reopen the saved microphone."
             }
         }
     }

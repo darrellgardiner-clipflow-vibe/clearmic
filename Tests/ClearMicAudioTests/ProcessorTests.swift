@@ -55,6 +55,80 @@ final class ProcessorTests: XCTestCase {
         XCTAssertEqual(20 * log10(rms(render(presence, controls: controls)) / rms(presence)), 3, accuracy: 0.1)
     }
 
+    func testBassShelfBoostsAndCutsLowsWithoutChangingHighs() {
+        var controls = CMDefaultControls()
+        controls.highPassHz = 0; controls.mudGainDB = 0; controls.presenceGainDB = 0
+        controls.compressionEnabled = 0
+        for gain: Float in [-6, 6] {
+            controls.bassGainDB = gain
+            let low = tone(20), corner = tone(120), high = tone(2000)
+            XCTAssertEqual(20 * log10(rms(render(low, controls: controls)) / rms(low)), Double(gain), accuracy: 0.1)
+            XCTAssertEqual(20 * log10(rms(render(corner, controls: controls)) / rms(corner)), Double(gain) / 2, accuracy: 0.1)
+            XCTAssertEqual(20 * log10(rms(render(high, controls: controls)) / rms(high)), 0, accuracy: 0.1)
+        }
+    }
+
+    func testAirShelfBoostsAndCutsHighsWithoutChangingLows() {
+        var controls = CMDefaultControls()
+        controls.highPassHz = 0; controls.mudGainDB = 0; controls.presenceGainDB = 0
+        controls.compressionEnabled = 0
+        for gain: Float in [-6, 6] {
+            controls.airGainDB = gain
+            let low = tone(200), corner = tone(8000), high = tone(20000)
+            XCTAssertEqual(20 * log10(rms(render(low, controls: controls)) / rms(low)), 0, accuracy: 0.1)
+            XCTAssertEqual(20 * log10(rms(render(corner, controls: controls)) / rms(corner)), Double(gain) / 2, accuracy: 0.1)
+            XCTAssertEqual(20 * log10(rms(render(high, controls: controls)) / rms(high)), Double(gain), accuracy: 0.1)
+        }
+    }
+
+    func testDeEsserReducesSibilantBandAndPreservesLowVoice() {
+        var controls = CMDefaultControls()
+        controls.highPassHz = 0; controls.mudGainDB = 0; controls.presenceGainDB = 0
+        controls.compressionEnabled = 0; controls.deEssAmount = 1
+        let low = tone(200), high = tone(7000)
+        XCTAssertEqual(20 * log10(rms(render(low, controls: controls)) / rms(low)), 0, accuracy: 0.2)
+        XCTAssertLessThan(20 * log10(rms(render(high, controls: controls)) / rms(high)), -2)
+    }
+
+    func testRoomAddsADecayingTailAndBypassStaysDry() {
+        var controls = CMDefaultControls()
+        controls.highPassHz = 0; controls.mudGainDB = 0; controls.presenceGainDB = 0
+        controls.compressionEnabled = 0; controls.reverbMix = 0.2
+        var impulse = [Float](repeating: 0, count: 96000)
+        impulse[4800] = 0.5
+        let output = render(impulse, controls: controls)
+        XCTAssertTrue(output.allSatisfy(\.isFinite))
+        let early = output[5000..<24000].reduce(0.0) { $0 + Double($1 * $1) }
+        let late = output[72000..<96000].reduce(0.0) { $0 + Double($1 * $1) }
+        XCTAssertGreaterThan(early, 0.0001)
+        XCTAssertLessThan(late, early * 0.01)
+        controls.bypass = 1
+        XCTAssertEqual(render(impulse, controls: controls), impulse)
+        controls.muted = 1
+        XCTAssertEqual(render(impulse, controls: controls), [Float](repeating: 0, count: impulse.count))
+    }
+
+    func testMuteClearsRoomSoMutedSpeechCannotReturnInTheTail() {
+        let processor = CMProcessorCreate(48000)!
+        defer { CMProcessorDestroy(processor) }
+        var controls = CMDefaultControls()
+        controls.highPassHz = 0; controls.mudGainDB = 0; controls.presenceGainDB = 0
+        controls.compressionEnabled = 0; controls.reverbMix = 0.25
+        CMProcessorSetControls(processor, controls)
+        var speech = [Float](repeating: 0, count: 10000)
+        speech[4800] = 0.5
+        speech.withUnsafeMutableBufferPointer { CMProcessorProcessMono(processor, $0.baseAddress!, UInt32($0.count)) }
+        controls.muted = 1
+        CMProcessorSetControls(processor, controls)
+        var muted = [Float](repeating: 0.1, count: 480)
+        muted.withUnsafeMutableBufferPointer { CMProcessorProcessMono(processor, $0.baseAddress!, UInt32($0.count)) }
+        controls.muted = 0
+        CMProcessorSetControls(processor, controls)
+        var after = [Float](repeating: 0, count: 10000)
+        after.withUnsafeMutableBufferPointer { CMProcessorProcessMono(processor, $0.baseAddress!, UInt32($0.count)) }
+        XCTAssertTrue(after.allSatisfy { abs($0) < 0.000001 }, "Muted speech must not reappear as reverb")
+    }
+
     func testCompressorSettlesOnExpectedStaticCurve() {
         var controls = CMDefaultControls()
         controls.highPassHz = 0; controls.mudGainDB = 0; controls.presenceGainDB = 0

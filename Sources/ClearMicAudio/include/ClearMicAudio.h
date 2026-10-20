@@ -21,6 +21,10 @@ typedef struct {
     uint32_t compressionEnabled;
     float monitorGainDB;
     uint32_t noiseReductionEnabled;
+    float bassGainDB;
+    float airGainDB;
+    float deEssAmount;
+    float reverbMix;
 } CMControls;
 
 typedef struct {
