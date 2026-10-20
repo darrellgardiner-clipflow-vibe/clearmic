@@ -3,13 +3,26 @@
     <channel>
         <title>ClearMic</title>
         <item>
+            <title>0.1.2</title>
+            <pubDate>Tue, 20 Oct 2026 13:00:00 +1100</pubDate>
+            <sparkle:version>3</sparkle:version>
+            <sparkle:shortVersionString>0.1.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/darrellgardiner-clipflow-vibe/clearmic/releases/download/v0.1.2/ClearMic-0.1.2.zip" length="1328461" type="application/octet-stream" sparkle:edSignature="fhwNEgRy22gRwFI747XB4APy0x7HUfHgtd3G9l3MQ/rbQeFsqhUuJ53df4/LdzMUx70OtgGYIXhgR5kf8GB4Bw=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/darrellgardiner-clipflow-vibe/clearmic/releases/download/v0.1.2/ClearMic3-2.delta" sparkle:deltaFrom="2" length="116974" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="976240" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="iFokhVBKwb9OOjbSWYmnyCW78PXcaHIQeUCPYP/YfyOwnqt2szpE5G43XXCBVZ57sK68oct7GAoXJbt/USJfAQ=="/>
+                <enclosure url="https://github.com/darrellgardiner-clipflow-vibe/clearmic/releases/download/v0.1.2/ClearMic3-1.delta" sparkle:deltaFrom="1" length="126582" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="976240" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="lYV3pPkW1LmSYy1t5eOVJt+f4BUeGY4gyXeta9fEIgkYTZOk16oRwdJlS94WcY0g6f4rSTzlWXwRw41MJJccBQ=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>0.1.1</title>
             <pubDate>Tue, 20 Oct 2026 12:53:53 +1100</pubDate>
             <sparkle:version>2</sparkle:version>
             <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/darrellgardiner-clipflow-vibe/clearmic/releases/download/v0.1.1/ClearMic-0.1.1.zip" length="1305371" type="application/octet-stream" sparkle:edSignature="alc9wA22+ZlNgRmkSx2b1bX2sNNHFnOS00Ng86TwyrmILoor1ix2b49QvwcSUVnyw9wRvYBc8lhGZbfMWxulDw=="/>
+            <enclosure url="https://github.com/darrellgardiner-clipflow-vibe/clearmic/releases/download/v0.1.2/ClearMic-0.1.1.zip" length="1305371" type="application/octet-stream" sparkle:edSignature="alc9wA22+ZlNgRmkSx2b1bX2sNNHFnOS00Ng86TwyrmILoor1ix2b49QvwcSUVnyw9wRvYBc8lhGZbfMWxulDw=="/>
             <sparkle:deltas>
                 <enclosure url="https://github.com/darrellgardiner-clipflow-vibe/clearmic/releases/download/v0.1.1/ClearMic2-1.delta" sparkle:deltaFrom="1" length="81310" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="976240" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="NBxdPiuJEwCrC163PyKvOAKthnx3TOHF59k3IrUPJjG/CYn0mwVJGbeU0v9MDeIPUFTjMqkOXTLeqf7UwkDhBQ=="/>
             </sparkle:deltas>
@@ -21,7 +34,7 @@
             <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/darrellgardiner-clipflow-vibe/clearmic/releases/download/v0.1.1/ClearMic-0.1.0.zip" length="1305721" type="application/octet-stream" sparkle:edSignature="DhQAudSd8TKryu6rBfMIPsGmMQW8ZiSD6JxwcKseUePNC0qrEKXHkIUIluKMcH3oZs5HUK4tMTKKIoq9fKalBw=="/>
+            <enclosure url="https://github.com/darrellgardiner-clipflow-vibe/clearmic/releases/download/v0.1.2/ClearMic-0.1.0.zip" length="1305721" type="application/octet-stream" sparkle:edSignature="DhQAudSd8TKryu6rBfMIPsGmMQW8ZiSD6JxwcKseUePNC0qrEKXHkIUIluKMcH3oZs5HUK4tMTKKIoq9fKalBw=="/>
         </item>
     </channel>
 </rss>
