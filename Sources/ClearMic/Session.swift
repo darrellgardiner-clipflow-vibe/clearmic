@@ -175,6 +175,18 @@ final class Session: ObservableObject {
         }
     }
 
+    func toggleMonitoring() {
+        if !running && settings.monitoring {
+            let generation = routeGeneration
+            Task {
+                guard generation == routeGeneration else { return }
+                await start()
+            }
+        } else {
+            settings.monitoring.toggle()
+        }
+    }
+
     func reconnectSource() async {
         refreshDevices()
         guard selectedDevice != nil else {

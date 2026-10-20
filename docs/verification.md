@@ -152,7 +152,7 @@ Actual voice preference and listening quality remain a live user check.
 
 ## Reorganized controls, saved voices and studio finish, 0.1.7
 
-Twenty-eight tests pass. Additional checks cover split-band high-frequency
+Twenty-nine tests pass. Additional checks cover split-band high-frequency
 attenuation with low-frequency retention, a finite reverb tail that decays,
 dry bypass/mute with reverb, and save/overwrite/reload of a named preset
 while preserving source, channel, headphone route/level, mute and bypass.
@@ -186,3 +186,9 @@ uses the existing start path. Normal instructional status strings are no
 longer emitted. Optional messages now contain errors or setup/source-loss
 information and appear only when present. The footer actions still require
 a live UI check.
+
+Monitoring status uses a headphones label and the mute indicator is an
+independent mic-slash label, so both can be shown together. Monitor On
+reflects an active monitor route, not just a saved toggle. A lifecycle test
+verifies Listen can restart after Stop and can disable headphone monitoring
+without stopping virtual mic processing.

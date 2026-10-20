@@ -76,7 +76,7 @@ struct ContentView: View {
                             Text("Processed voice · use headphones").font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
                         }
                         if !narrow { Spacer() }
-                        key("listen", "headphones", on: session.settings.monitoring, color: Panel.orange) { session.settings.monitoring.toggle() }
+                        key("listen", "headphones", on: session.listening, color: Panel.orange) { session.toggleMonitoring() }
                             .disabled(session.selectedMonitor == nil)
                     }
                     display(narrow: narrow)
@@ -228,8 +228,14 @@ struct ContentView: View {
                 meter("OUT", session.outputDB)
                 HStack { Text("REDUCTION").opacity(0.6); Spacer(); Text(String(format: "%.1f dB", session.reductionDB)) }
                     .font(.system(size: 11, design: .monospaced))
-                Text(session.settings.muted ? "MIC MUTED" : session.settings.monitoring ? "HEADPHONE MONITOR ON" : "HEADPHONE MONITOR OFF")
-                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(session.settings.muted ? Panel.orange : Panel.lcd.opacity(0.6))
+                HStack(spacing: 14) {
+                    Label(session.listening ? "Monitor On" : "Monitor Off", systemImage: "headphones")
+                        .foregroundStyle(Panel.lcd.opacity(session.listening ? 0.85 : 0.5))
+                    if session.settings.muted {
+                        Label("Muted", systemImage: "mic.slash").foregroundStyle(Panel.orange)
+                    }
+                }.font(.system(size: 10, design: .monospaced))
+
             }.frame(maxWidth: narrow ? .infinity : 280)
         }.padding(23).foregroundStyle(Panel.lcd)
             .background {

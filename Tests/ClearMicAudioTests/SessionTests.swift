@@ -5,9 +5,9 @@ import XCTest
 
 private final class TestRoute: AudioRouting {
     let sourceID: AudioObjectID
-    let monitorID: AudioObjectID? = nil
+    let monitorID: AudioObjectID?
     var stopped = false
-    init(_ source: AudioDevice) { sourceID = source.id }
+    init(_ source: AudioDevice, monitorID: AudioObjectID? = nil) { sourceID = source.id; self.monitorID = monitorID }
     func update(_ controls: CMControls) {}
     func meters() -> CMMeters { CMMeters() }
     func stop() { stopped = true }
@@ -120,6 +120,34 @@ final class SessionTests: XCTestCase {
         await session.reconnectSource()
         XCTAssertTrue(session.running)
         XCTAssertFalse(session.sourceLost)
+        session.stop()
+    }
+
+    @MainActor func testListenRestartsAfterStopAndCanDisableMonitoring() async {
+        let suite = "ClearMicTests.\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let source = AudioDevice(id: 1, uid: "usb", name: "USB microphone", inputChannels: 1, outputChannels: 0, sampleRate: 48000)
+        let headphones = AudioDevice(id: 2, uid: "phones", name: "Headphones", inputChannels: 0, outputChannels: 2, sampleRate: 48000)
+        let session = Session(defaults: defaults, listDevices: { [source, headphones] }, permission: { true }, makeRoute: { source, _, monitor, _ in TestRoute(source, monitorID: monitor?.id) }, pollDevices: false)
+        session.selectSource("usb")
+        session.settings.monitorUID = "phones"
+        session.toggleMonitoring()
+        for _ in 0..<20 { await Task.yield() }
+        XCTAssertTrue(session.listening)
+        session.stop()
+        XCTAssertFalse(session.listening)
+        session.toggleMonitoring()
+        session.stop()
+        for _ in 0..<20 { await Task.yield() }
+        XCTAssertFalse(session.running, "Stop must cancel a queued Listen restart")
+        session.toggleMonitoring()
+        for _ in 0..<20 { await Task.yield() }
+        XCTAssertTrue(session.listening)
+        session.toggleMonitoring()
+        for _ in 0..<20 { await Task.yield() }
+        XCTAssertFalse(session.listening)
+        XCTAssertTrue(session.running, "Turning off Listen should keep the virtual microphone processing")
         session.stop()
     }
 
