@@ -3,13 +3,25 @@
     <channel>
         <title>ClearMic</title>
         <item>
+            <title>0.1.1</title>
+            <pubDate>Tue, 20 Oct 2026 12:53:53 +1100</pubDate>
+            <sparkle:version>2</sparkle:version>
+            <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/darrellgardiner-clipflow-vibe/clearmic/releases/download/v0.1.1/ClearMic-0.1.1.zip" length="1305371" type="application/octet-stream" sparkle:edSignature="alc9wA22+ZlNgRmkSx2b1bX2sNNHFnOS00Ng86TwyrmILoor1ix2b49QvwcSUVnyw9wRvYBc8lhGZbfMWxulDw=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/darrellgardiner-clipflow-vibe/clearmic/releases/download/v0.1.1/ClearMic2-1.delta" sparkle:deltaFrom="1" length="81310" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="976240" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="NBxdPiuJEwCrC163PyKvOAKthnx3TOHF59k3IrUPJjG/CYn0mwVJGbeU0v9MDeIPUFTjMqkOXTLeqf7UwkDhBQ=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>0.1.0</title>
             <pubDate>Tue, 20 Oct 2026 12:36:07 +1100</pubDate>
             <sparkle:version>1</sparkle:version>
             <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/darrellgardiner-clipflow-vibe/clearmic/releases/download/v0.1.0/ClearMic-0.1.0.zip" length="1305721" type="application/octet-stream" sparkle:edSignature="DhQAudSd8TKryu6rBfMIPsGmMQW8ZiSD6JxwcKseUePNC0qrEKXHkIUIluKMcH3oZs5HUK4tMTKKIoq9fKalBw=="/>
+            <enclosure url="https://github.com/darrellgardiner-clipflow-vibe/clearmic/releases/download/v0.1.1/ClearMic-0.1.0.zip" length="1305721" type="application/octet-stream" sparkle:edSignature="DhQAudSd8TKryu6rBfMIPsGmMQW8ZiSD6JxwcKseUePNC0qrEKXHkIUIluKMcH3oZs5HUK4tMTKKIoq9fKalBw=="/>
         </item>
     </channel>
 </rss>
