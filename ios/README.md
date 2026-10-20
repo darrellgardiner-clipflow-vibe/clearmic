@@ -132,16 +132,17 @@ build. Signing/export and the new app record remain separate release steps.
 ## TestFlight maintenance
 
 Release settings live in `ios/Release.json`. `scripts/ios-release.py` resolves
-TEAM_ID, ASC_KEY_PATH, ASC_KEY_ID, ASC_ISSUER_ID and SIGNING_KEYCHAIN at runtime
+TEAM_ID, ASC_KEY_PATH, ASC_KEY_ID, ASC_ISSUER_ID and CLEARMIC_SIGNING_KEYCHAIN at runtime
 through the existing studio credential library on the mini. It uses an already
 unlocked keychain when available; only a locked keychain needs the existing
-SIGNING_KEYCHAIN_PASSWORD credential. Credential values are redacted from build
+CLEARMIC_SIGNING_KEYCHAIN_PASSWORD credential. Credential values are redacted from build
 logs and never committed. No secrets are copied from Link Inbox or the laptop.
 
 ```sh
 cd ios
 make test
 make ios-register          # idempotently reserve the bundle identifier
+python3 ../scripts/ios-signing-setup.py  # once, ClearMic-only certificate and profile
 make ios-archive           # unsigned archive, then ad-hoc signature
 make ios-export            # fresh archive, signed App Store IPA
 make ios-upload            # fresh archive, signed export and upload
@@ -162,3 +163,14 @@ upload. Archive/export logs and the IPA stay under `build/ios-release/`.
 The signed IPA can be prepared before the browser app record is available.
 An upload is not TestFlight availability until processing is VALID and the
 owner's Internal group has access to the build.
+
+ClearMic has its own distribution certificate, provisioning profile and keychain
+on the mini. This avoids the locked Link Inbox keychain and does not revoke or
+replace its identity. Signing setup uses one additional Apple Distribution
+certificate, refuses to revoke any certificate at the team limit, and persists
+partial progress to avoid issuing duplicates after a retry. Its private key stays
+on the mini and is imported into the ClearMic keychain; the temporary PEM is
+removed after successful setup. A password-protected identity backup remains in
+the owner-only signing directory. The generated keychain password is stored under
+ClearMic-specific names in the existing owner-only studio device credential file.
+The release export explicitly selects this certificate and profile.

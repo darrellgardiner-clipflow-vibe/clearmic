@@ -176,18 +176,25 @@ def unlock_if_needed(values):
         result = security.SecKeychainGetStatus(keychain, ctypes.byref(status))
         if result != 0: raise RuntimeError('Signing keychain status is unavailable.')
         if not (status.value & 1):
-            password = credentials('SIGNING_KEYCHAIN_PASSWORD')
-            run(['security', 'unlock-keychain', '-p', password['SIGNING_KEYCHAIN_PASSWORD'], values['SIGNING_KEYCHAIN']], 'keychain-unlock', {**values, **password})
+            password = credentials('CLEARMIC_SIGNING_KEYCHAIN_PASSWORD')
+            run(['security', 'unlock-keychain', '-p', password['CLEARMIC_SIGNING_KEYCHAIN_PASSWORD'], values['SIGNING_KEYCHAIN']], 'keychain-unlock', {**values, **password})
     finally: security.CFRelease(keychain)
 
 
 def release(destination):
     if destination == 'upload':
         AppStore().app()
-    values = credentials('TEAM_ID', 'ASC_KEY_PATH', 'ASC_KEY_ID', 'ASC_ISSUER_ID', 'SIGNING_KEYCHAIN')
+    values = credentials('TEAM_ID', 'ASC_KEY_PATH', 'ASC_KEY_ID', 'ASC_ISSUER_ID', 'CLEARMIC_SIGNING_KEYCHAIN')
+    values['SIGNING_KEYCHAIN'] = values['CLEARMIC_SIGNING_KEYCHAIN']
+    identity_path = Path.home() / '.local/share/clearmic-signing/ios/identity.json'
+    if not identity_path.is_file(): raise RuntimeError('Run scripts/ios-signing-setup.py on the mini first.')
+    identity = json.loads(identity_path.read_text())
+    if not identity.get('complete'): raise RuntimeError('ClearMic signing setup is incomplete.')
     archive()
     unlock_if_needed(values)
-    options = {'method': 'app-store-connect', 'destination': destination, 'teamID': values['TEAM_ID'], 'signingStyle': 'automatic'}
+    options = {'method': 'app-store-connect', 'destination': destination, 'teamID': values['TEAM_ID'],
+               'signingStyle': 'manual', 'signingCertificate': identity['sha1'],
+               'provisioningProfiles': {CONFIG['bundleId']: identity['profileUUID']}}
     options_path = OUTPUT / 'export-options.plist'
     options_path.write_bytes(plistlib.dumps(options))
     run(['xcodebuild', '-exportArchive', '-archivePath', str(ARCHIVE), '-exportPath', str(OUTPUT / 'export'), '-exportOptionsPlist', str(options_path),
