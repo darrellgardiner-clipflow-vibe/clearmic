@@ -1,0 +1,15 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>ClearMic</title>
+        <item>
+            <title>0.1.0</title>
+            <pubDate>Tue, 20 Oct 2026 12:36:07 +1100</pubDate>
+            <sparkle:version>1</sparkle:version>
+            <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/darrellgardiner-clipflow-vibe/clearmic/releases/download/v0.1.0/ClearMic-0.1.0.zip" length="1305721" type="application/octet-stream" sparkle:edSignature="DhQAudSd8TKryu6rBfMIPsGmMQW8ZiSD6JxwcKseUePNC0qrEKXHkIUIluKMcH3oZs5HUK4tMTKKIoq9fKalBw=="/>
+        </item>
+    </channel>
+</rss>

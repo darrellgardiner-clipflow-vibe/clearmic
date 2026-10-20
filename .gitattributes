@@ -1,0 +1,3 @@
+# Preserve pinned upstream files byte-for-byte, including their whitespace.
+vendor/BlackHole/** -whitespace
+LICENSE -whitespace

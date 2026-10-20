@@ -1,0 +1,89 @@
+# Architecture
+
+## User workflow
+
+Install the app and driver, select one physical input channel, start processing,
+then select ClearMic in the recording/call app. Closing the app window keeps the
+route alive in the menu bar. Stopping or quitting stops the route. Optional
+Listen adds a selected headphone output with drift correction and an independent
+level. It can run without the virtual driver so users can audition effects first.
+
+## Data ownership
+
+- `Session` owns editable/persisted voice settings and application state. It
+  writes preferences and controls on the main thread. Device UIDs are persisted;
+  transient Core Audio IDs and meters are not.
+- `AudioRoute` owns one private aggregate, one IOProc registration and one DSP
+  allocation. Teardown stops the callback before destroying registration,
+  aggregate and processor. A failed start uses the same teardown path.
+- `CMProcessor` owns biquad, compressor and limiter state exclusively on the
+  render thread. Controls cross via bounded atomic snapshots; meters cross via
+  lock-free atomics. The callback never enters Swift.
+- The pinned driver owns transport between the hidden send device and visible
+  microphone. No proprietary transport or capture engine is used.
+
+The app exposes effects through `Session.settings`, starts through `start()` and
+stops through `stop()`. The UI never coordinates Core Audio resource creation.
+
+## Audio path
+
+1. Resolve the selected physical source, `ClearMic_UID` and `ClearMic_2_UID`.
+2. Validate 48 kHz and the source channel. Create a private stacked aggregate
+   with the source first and hidden send second. Source is the clock master;
+   send has drift compensation enabled.
+3. Validate stream format and complete input/output channel counts before I/O.
+4. The C++ IOProc clears output buffers, selects one input channel, processes
+   mono, and writes it only to the two send channels. Physical output channels
+   remain zero unless explicitly selected for Listen. Interleaved and separate
+   float buffers are supported.
+5. The driver makes those two equal channels readable as the ClearMic input.
+
+`stacked = true` is required. The SDK documents `false` as mirroring output
+streams, which could put microphone audio on physical outputs.
+
+The process-private aggregate disappears on process exit. The installed public
+microphone remains. The app never changes system default devices or silently
+falls back to another microphone. Disconnect recovery currently requires Start;
+there is no automatic UID/model matching beyond the saved exact UID.
+
+## Processing
+
+Input trim → second-order Butterworth high-pass → 280 Hz bell, Q 0.8 →
+3.5 kHz bell, Q 0.7 → peak compression → output gain → −1 dBFS limiter.
+Compression uses a 10 ms attack and 120 ms release. Bypass returns the raw
+selected input, including bypassing the limiter. Mute always wins.
+
+Each controls write marks an atomic snapshot in progress, publishes bounded
+values, then completes it. The callback makes one attempt to read a coherent
+snapshot per block; if a write overlaps it keeps the previous controls. There
+is no spin loop. Input/output gain changes are smoothed over 5 ms.
+
+## Synthesis decision
+
+Two independent designs compared a new HAL driver with a customized BlackHole
+driver. Both converged on a private aggregate and a C/C++ IOProc for clock and
+channel ownership. The BlackHole design is the base because it supplies an
+existing, attributed transport with a documented hidden-mirror configuration.
+GPLv3 is acceptable for this public open-source product.
+
+From the new-driver candidate, retain strict lifetime ownership, persistent UID
+selection and failure-to-silence behavior. Reject writing a new HAL object and
+timestamp implementation for the first release. It adds maintenance without
+improving this microphone path. The independent cross-judge also selected this
+design and identified atomic ordering and abrupt controls as hazards. Sequentially
+consistent atomic snapshots and 5 ms mute/bypass/filter ramps address those.
+The factory UUID was checked against upstream and differs.
+
+## Tradeoffs and remaining work
+
+We accept a GPLv3 driver and administrator-approved installation in exchange
+for a microphone ordinary apps can select. We accept 48 kHz and one mic in
+exchange for a small inspectable route. Monitoring is off at launch and requires
+an explicit headphone destination.
+
+The first build still needs live driver installation, browser capture and
+endurance verification. Developer ID signing/notarization are distribution
+prerequisites. Device changes are polled every two seconds and currently require
+a manual restart of processing after disconnect. Monitoring output must also
+run at 48 kHz. These limits must not be described as passed tests or finished
+release behavior.
