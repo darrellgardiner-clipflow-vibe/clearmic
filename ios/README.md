@@ -23,7 +23,7 @@ ID or Apple Developer team for device signing. No signing team is committed.
 1. Open `ios/ClearMic.xcodeproj` in Xcode.
 2. Select the **ClearMic-iOS** scheme and the **ClearMic-iOS** target.
 3. Under Signing & Capabilities, select your team. A personal team may require a
-   unique bundle identifier instead of `org.clearmic.ios`.
+   unique bundle identifier instead of `flow-labs.clearmic`.
 4. Connect and unlock the iPhone, trust this Mac if requested, and enable Developer
    Mode on the phone if Xcode requires it.
 5. Select the iPhone as the run destination and Run.
@@ -115,7 +115,8 @@ its Xcode installation includes the required iOS platform and simulator runtime.
 The laptop checkout is retained as a copy. No app preferences or signing secrets
 were transferred. Link Inbox's existing signing identities and credential store
 on the mini are the reference for adding ClearMic's own TestFlight release flow.
-ClearMic has not yet been registered or uploaded to App Store Connect.
+The release identity is `flow-labs.clearmic`. TestFlight is distributed to the
+existing owner through an Internal group; it is separate from the macOS updater.
 
 From this repo on the mini:
 
@@ -127,3 +128,37 @@ xcodebuild -project ios/ClearMic.xcodeproj -scheme ClearMic-iOS -destination 'ge
 
 The archive is unsigned preparation, not an installable or uploaded TestFlight
 build. Signing/export and the new app record remain separate release steps.
+
+## TestFlight maintenance
+
+Release settings live in `ios/Release.json`. `scripts/ios-release.py` resolves
+TEAM_ID, ASC_KEY_PATH, ASC_KEY_ID, ASC_ISSUER_ID and SIGNING_KEYCHAIN at runtime
+through the existing studio credential library on the mini. It uses an already
+unlocked keychain when available; only a locked keychain needs the existing
+SIGNING_KEYCHAIN_PASSWORD credential. Credential values are redacted from build
+logs and never committed. No secrets are copied from Link Inbox or the laptop.
+
+```sh
+cd ios
+make test
+make ios-register          # idempotently reserve the bundle identifier
+make ios-archive           # unsigned archive, then ad-hoc signature
+make ios-export            # fresh archive, signed App Store IPA
+make ios-upload            # fresh archive, signed export and upload
+make ios-status            # processing state and internal beta availability
+make ios-enable-testing    # existing owner only, no external review submission
+```
+
+Create the app record once in App Store Connect with the name ClearMic, bundle
+identifier `flow-labs.clearmic`, SKU `CLEARMIC-IOS` and locale English US. The API
+supports bundle registration, upload and tester management; app-record creation
+uses the signed-in App Store Connect website. These commands do not submit the
+app for public App Store review or external beta review.
+
+Commit before archiving. Build numbers come from the commit count, and the
+ignored `build/ios-release/manifest.json` records the exact source commit,
+version, build and bundle identifier. Increment the source commit for another
+upload. Archive/export logs and the IPA stay under `build/ios-release/`.
+The signed IPA can be prepared before the browser app record is available.
+An upload is not TestFlight availability until processing is VALID and the
+owner's Internal group has access to the build.

@@ -1,0 +1,7 @@
+{
+  "bundleId": "flow-labs.clearmic",
+  "name": "ClearMic",
+  "version": "0.1.0",
+  "locale": "en-US",
+  "sku": "CLEARMIC-IOS"
+}

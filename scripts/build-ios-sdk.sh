@@ -17,11 +17,13 @@ for ios_sdk in iphoneos iphonesimulator; do
         -parse-as-library -I "$ios_output" "$ios_output/RouteCore.o" ios/App/*.swift \
         -o "$ios_app/ClearMic"
     python3 - "$ios_app" "$ios_sdk" <<'PY'
-import pathlib, plistlib, sys
+import json, pathlib, plistlib, subprocess, sys
 app = pathlib.Path(sys.argv[1])
 info = plistlib.loads(pathlib.Path('ios/App/Info.plist').read_bytes())
 info.update(CFBundleDevelopmentRegion='en', CFBundleExecutable='ClearMic',
-            CFBundleIdentifier='org.clearmic.ios', CFBundleName='ClearMic',
+            CFBundleIdentifier=json.loads(pathlib.Path('ios/Release.json').read_text())['bundleId'], CFBundleName='ClearMic',
+            CFBundleShortVersionString=json.loads(pathlib.Path('ios/Release.json').read_text())['version'],
+            CFBundleVersion=subprocess.check_output(['git', 'rev-list', '--count', 'HEAD'], text=True).strip(),
             MinimumOSVersion='17.0', UIDeviceFamily=[1, 2],
             CFBundleSupportedPlatforms=['iPhoneOS' if sys.argv[2] == 'iphoneos' else 'iPhoneSimulator'])
 (app / 'Info.plist').write_bytes(plistlib.dumps(info))
