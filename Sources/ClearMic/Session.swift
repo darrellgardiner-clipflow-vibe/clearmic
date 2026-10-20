@@ -47,13 +47,21 @@ final class Session: ObservableObject {
     static let shared = Session()
     @Published var settings: VoiceSettings {
         didSet {
-            if let encoded = try? JSONEncoder().encode(settings) { UserDefaults.standard.set(encoded, forKey: "voiceSettings") }
-            if oldValue.sourceUID != settings.sourceUID || oldValue.channel != settings.channel {
+            if let encoded = try? JSONEncoder().encode(settings) { defaults.set(encoded, forKey: "voiceSettings") }
+            let inputChanged = oldValue.sourceUID != settings.sourceUID || oldValue.channel != settings.channel
+            let outputChanged = oldValue.monitorUID != settings.monitorUID || oldValue.monitoring != settings.monitoring
+            if inputChanged || outputChanged {
+                let resume = running || starting || restartPending || (outputChanged && settings.monitoring)
                 stop()
-            } else if oldValue.monitorUID != settings.monitorUID || oldValue.monitoring != settings.monitoring {
-                let resume = running || settings.monitoring
-                stop()
-                if resume { Task { await start() } }
+                let generation = routeGeneration
+                if resume {
+                    restartPending = true
+                    Task {
+                        guard generation == routeGeneration else { return }
+                        restartPending = false
+                        await start()
+                    }
+                }
             } else { route?.update(settings.controls) }
         }
     }
@@ -67,7 +75,13 @@ final class Session: ObservableObject {
     @Published private(set) var inputDB: Float = -120
     @Published private(set) var outputDB: Float = -120
     @Published private(set) var reductionDB: Float = 0
-    private var route: AudioRoute?
+    private var restartPending = false
+    private var routeGeneration = 0
+    private var route: AudioRouting?
+    private let defaults: UserDefaults
+    private let listDevices: () -> [AudioDevice]
+    private let permission: () async -> Bool
+    private let makeRoute: (AudioDevice, Int, AudioDevice?, CMControls) throws -> AudioRouting
     private var timer: Timer?
     private var ticks = 0
     private var lastFrameCount: UInt64 = 0
@@ -79,16 +93,35 @@ final class Session: ObservableObject {
     var canStart: Bool { selectedDevice != nil && !starting }
     var listening: Bool { running && route?.monitorID != nil }
 
-    private init() {
-        settings = VoiceSettings.load(UserDefaults.standard.data(forKey: "voiceSettings"))
+    init(defaults: UserDefaults = .standard,
+         listDevices: @escaping () -> [AudioDevice] = AudioHardware.devices,
+         permission: @escaping () async -> Bool = Session.microphonePermission,
+         makeRoute: @escaping (AudioDevice, Int, AudioDevice?, CMControls) throws -> AudioRouting = {
+             try AudioRoute(source: $0, channel: $1, monitor: $2, controls: $3)
+         }, pollDevices: Bool = true) {
+        self.defaults = defaults
+        self.listDevices = listDevices
+        self.permission = permission
+        self.makeRoute = makeRoute
+        settings = VoiceSettings.load(defaults.data(forKey: "voiceSettings"))
         refreshDevices()
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.tick() }
+        if pollDevices {
+            timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+                Task { @MainActor in self?.tick() }
+            }
+        }
+    }
+
+    nonisolated static func microphonePermission() async -> Bool {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized: return true
+        case .notDetermined: return await AVCaptureDevice.requestAccess(for: .audio)
+        default: return false
         }
     }
 
     func refreshDevices() {
-        let all = AudioHardware.devices()
+        let all = listDevices()
         let listed = all.filter {
             $0.inputChannels > 0 && $0.uid != AudioHardware.microphoneUID && !$0.uid.hasPrefix("org.clearmic.route.")
         }
@@ -104,16 +137,21 @@ final class Session: ObservableObject {
         }
     }
 
+    func selectSource(_ uid: String) {
+        guard settings.sourceUID != uid else { return }
+        var next = settings
+        next.sourceUID = uid
+        next.channel = 0
+        settings = next
+    }
+
     func start() async {
         guard !running && !starting else { return }
         starting = true
-        defer { starting = false }
-        let permitted: Bool
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .authorized: permitted = true
-        case .notDetermined: permitted = await AVCaptureDevice.requestAccess(for: .audio)
-        default: permitted = false
-        }
+        let generation = routeGeneration
+        defer { if generation == routeGeneration { starting = false } }
+        let permitted = await permission()
+        guard generation == routeGeneration else { return }
         guard permitted else {
             message = "Allow ClearMic in System Settings → Privacy & Security → Microphone."
             return
@@ -122,8 +160,7 @@ final class Session: ObservableObject {
         guard let source = selectedDevice else { message = "Choose an available microphone first."; return }
         do {
             if settings.monitoring && selectedMonitor == nil { throw RouteError("Choose your headphone output first.") }
-            route = try AudioRoute(source: source, channel: settings.channel,
-                                   monitor: settings.monitoring ? selectedMonitor : nil, controls: settings.controls)
+            route = try makeRoute(source, settings.channel, settings.monitoring ? selectedMonitor : nil, settings.controls)
             running = true
             lastFrameCount = 0; stalledTicks = 0
             message = driverInstalled ? "Select ClearMic as the microphone in Riverside or your call app." : settings.monitoring ? "Listening to processed voice. Install the virtual mic for Riverside." : "Input is active. Turn on Listen to hear your voice, or install the virtual mic for Riverside."
@@ -135,6 +172,9 @@ final class Session: ObservableObject {
     }
 
     func stop() {
+        routeGeneration += 1
+        restartPending = false
+        starting = false
         route?.stop(); route = nil
         running = false
         inputDB = -120; outputDB = -120; reductionDB = 0

@@ -127,7 +127,15 @@ struct RouteError: LocalizedError {
     var errorDescription: String? { message }
 }
 
-final class AudioRoute {
+protocol AudioRouting: AnyObject {
+    var sourceID: AudioObjectID { get }
+    var monitorID: AudioObjectID? { get }
+    func update(_ controls: CMControls)
+    func meters() -> CMMeters
+    func stop()
+}
+
+final class AudioRoute: AudioRouting {
     private var aggregate = AudioObjectID(kAudioObjectUnknown)
     private var ioProc: AudioDeviceIOProcID?
     private var processor: OpaquePointer?
@@ -143,7 +151,7 @@ final class AudioRoute {
         }
         guard channel >= 0 && channel < source.inputChannels else { throw RouteError("That input channel is unavailable.") }
         guard abs(source.sampleRate - 48000) < 1 else {
-            throw RouteError("Set your interface to 48,000 Hz in Audio MIDI Setup before starting. ClearMic does not change hardware settings.")
+            throw RouteError("\(source.name) provides \(Int(source.sampleRate)) Hz. ClearMic currently needs a 48,000 Hz input; Bluetooth microphones may not support it. Choose a 48 kHz microphone, or set a supported interface to 48,000 Hz in Audio MIDI Setup.")
         }
         let hasVirtual = AudioHardware.resolve(AudioHardware.microphoneUID) != nil && AudioHardware.resolve(AudioHardware.sendUID) != nil
         if let monitor {

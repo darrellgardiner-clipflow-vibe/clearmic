@@ -17,7 +17,7 @@ struct ClearMicApp: App {
     var body: some Scene {
         WindowGroup("ClearMic", id: "main") {
             ContentView(session: session)
-                .frame(minWidth: 420, minHeight: 520)
+                .frame(minWidth: 320, minHeight: 520)
         }
         .defaultSize(width: 1080, height: 800)
         .windowStyle(.hiddenTitleBar)

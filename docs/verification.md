@@ -55,10 +55,10 @@ the build scripts deliberately do not do that as a test side effect.
 
 ## Native UI rendering
 
-Run `scripts/render-ui.sh` to render the actual SwiftUI content at 1080 and
-420 points wide into `build/ui/`. The helper draws its own offscreen hosting
+Run `scripts/render-ui.sh` to render the actual SwiftUI content at 1080, 820,
+600, 420 and 320 points wide in both light and dark appearances into `build/ui/`. The helper draws its own offscreen hosting
 view, without desktop capture, microphone capture or UI automation. Inspect
-both images for wrapping and control depth. Resize the running app to check
+the images for wrapping and control depth. Resize the running app to check
 scrolling, keyboard focus and pressed/hover states; the static renders do not
 prove those interactions.
 
@@ -72,3 +72,26 @@ instead of the `launchctl kickstart` action rejected by SIP on the test Mac.
 A successful request is not reported as a loaded driver until enumeration
 finds both devices. The command is not run during automated verification;
 its effect on this Mac remains a manual check via Load microphone.
+
+
+## Source switching and appearance checks, 2026-10-20
+
+The fourteen tests pass, including four Session tests using isolated preferences
+and fake audio/permission boundaries. They exercise restarting active source
+selection, resetting the channel for mono input, selecting while stopped,
+Stop cancelling queued restarts, rapid repeated selections, and an old permission
+response arriving after a newer source starts. No test captures live audio or
+changes system default devices. The app and universal driver build and their
+local signatures verify through `scripts/check.sh`.
+
+Native renders cover five widths from 320 through 1080 points in both system
+appearances. The 320-point dark and 820-point light renders were inspected for
+control clipping and wrapping. This checks the real SwiftUI layout, not live
+window dragging or audio capture. The installed app still needs a live source
+switching smoke test with speech and a system appearance change while open.
+
+The read-only device probe reports the connected AirPods Pro microphone at
+24,000 Hz and its output at 48,000 Hz. The engine still requires a 48,000 Hz
+input. Source switching fixes do not establish Bluetooth microphone support;
+unsupported sample rates are labelled and refused explicitly. No driver was
+installed and Core Audio was not restarted during these checks.

@@ -1,8 +1,16 @@
+import AppKit
 import SwiftUI
 
 private enum Panel {
-    static let ink = Color(red: 0.18, green: 0.19, blue: 0.18)
-    static let ivory = Color(red: 0.89, green: 0.88, blue: 0.84)
+    static func adaptive(_ light: NSColor, _ dark: NSColor) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
+        })
+    }
+    static let ink = adaptive(NSColor(white: 0.18, alpha: 1), NSColor(white: 0.90, alpha: 1))
+    static let ivory = adaptive(NSColor(red: 0.89, green: 0.88, blue: 0.84, alpha: 1), NSColor(white: 0.18, alpha: 1))
+    static let surface = adaptive(NSColor(red: 0.96, green: 0.95, blue: 0.91, alpha: 1), NSColor(white: 0.25, alpha: 1))
+    static let highlight = adaptive(NSColor(white: 1, alpha: 0.8), NSColor(white: 1, alpha: 0.08))
     static let orange = Color(red: 0.93, green: 0.26, blue: 0.10)
     static let blue = Color(red: 0.26, green: 0.43, blue: 0.56)
     static let lcd = Color(red: 0.77, green: 0.80, blue: 0.70)
@@ -12,7 +20,8 @@ struct ContentView: View {
     @ObservedObject var session: Session
     var body: some View {
         GeometryReader { geometry in
-            let narrow = geometry.size.width < 760
+            let narrow = geometry.size.width < 820
+            let compact = geometry.size.width < 440
             let stacked = geometry.size.width < 900
             ScrollView {
                 VStack(spacing: 22) {
@@ -21,7 +30,7 @@ struct ContentView: View {
                             Text("clearmic").font(.system(size: 32, weight: .medium, design: .rounded)).tracking(-1.5)
                             caption("CM–01 / DESKTOP VOICE PROCESSOR")
                         }
-                        Spacer()
+                        if !narrow { Spacer() }
                         HStack(spacing: 12) {
                         key("bypass", "arrow.triangle.branch", on: session.settings.bypass, color: Panel.blue) { session.settings.bypass.toggle() }
                         key("mute", "mic.slash", on: session.settings.muted, color: Panel.orange) { session.settings.muted.toggle() }
@@ -33,16 +42,18 @@ struct ContentView: View {
                     (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 22)) : AnyLayout(HStackLayout(spacing: 22))) {
                         VStack(alignment: .leading, spacing: 8) {
                             caption("01 / SOURCE")
-                            Picker("Microphone", selection: $session.settings.sourceUID) {
+                            Picker("Microphone", selection: Binding(get: { session.settings.sourceUID }, set: session.selectSource)) {
                                 Text("Select microphone").tag("")
                                 if !session.settings.sourceUID.isEmpty && session.selectedDevice == nil {
                                     Text("Saved input disconnected").tag(session.settings.sourceUID)
                                 }
-                                ForEach(session.devices) { Text($0.name).tag($0.uid) }
-                            }.labelsHidden().frame(width: 240)
+                                ForEach(session.devices) { device in
+                                    Text(device.sampleRate == 48000 ? device.name : "\(device.name) (\(Int(device.sampleRate / 1000)) kHz, unsupported)").tag(device.uid)
+                                }
+                            }.labelsHidden().frame(maxWidth: narrow ? .infinity : 240)
                             Picker("Channel", selection: $session.settings.channel) {
                                 ForEach(0..<max(1, session.selectedDevice?.inputChannels ?? 1), id: \.self) { Text("Input \($0 + 1)").tag($0) }
-                            }.frame(width: 160)
+                            }.frame(maxWidth: 160)
                         }
                         if !narrow { Divider().frame(height: 65) }
                         VStack(alignment: .leading, spacing: 8) {
@@ -53,10 +64,10 @@ struct ContentView: View {
                                     Text("Saved output disconnected").tag(session.settings.monitorUID)
                                 }
                                 ForEach(session.outputs) { Text($0.name).tag($0.uid) }
-                            }.labelsHidden().frame(width: 240)
+                            }.labelsHidden().frame(maxWidth: narrow ? .infinity : 240)
                             Text("Processed voice · use headphones").font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
                         }
-                        Spacer()
+                        if !narrow { Spacer() }
                         key("listen", "headphones", on: session.settings.monitoring, color: Panel.blue) { session.settings.monitoring.toggle() }
                             .disabled(session.selectedMonitor == nil)
                     }
@@ -90,11 +101,11 @@ struct ContentView: View {
                         Button("natural") { session.applyNatural() }.buttonStyle(HardwareButton())
                         Button("flat") { session.applyFlat() }.buttonStyle(HardwareButton())
                         }
-                        Spacer(minLength: 0)
+                        if !narrow { Spacer(minLength: 0) }
                         HStack {
                         Image(systemName: "headphones").foregroundStyle(Panel.blue)
                         Text("listen level").font(.system(size: 11, design: .monospaced))
-                        Slider(value: $session.settings.monitorGain, in: -48...0).frame(width: 135).tint(Panel.blue)
+                        Slider(value: $session.settings.monitorGain, in: -48...0).frame(minWidth: 50, maxWidth: 135).tint(Panel.blue)
                         Text(String(format: "%.0f dB", session.settings.monitorGain)).font(.system(size: 11, design: .monospaced)).frame(width: 45)
                         }
                     }
@@ -103,7 +114,7 @@ struct ContentView: View {
                         Circle().fill(session.running ? Panel.blue : Panel.ink.opacity(0.25)).frame(width: 7, height: 7)
                         Text(session.message).font(.system(size: 11, design: .monospaced)).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
                         }
-                        Spacer(minLength: 0)
+                        if !narrow { Spacer(minLength: 0) }
                         if !session.driverInstalled {
                             Button(session.driverOnDisk ? "load microphone" : "install microphone") {
                                 if session.driverOnDisk { session.reloadAudioService() } else { session.installDriver() }
@@ -112,16 +123,16 @@ struct ContentView: View {
                     }
                     (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout())) {
                         caption("LOCAL AUDIO / 48,000 Hz / GPLv3")
-                        Spacer()
+                        if !narrow { Spacer() }
                         caption(session.driverInstalled ? "VIRTUAL MIC CONNECTED" : session.driverOnDisk ? "VIRTUAL MIC NEEDS LOADING" : "VIRTUAL MIC NOT INSTALLED")
                     }
                 }
-                .padding(narrow ? 22 : 32)
+                .padding(compact ? 16 : narrow ? 22 : 32)
                 .frame(maxWidth: .infinity)
             }
         }
-        .background(LinearGradient(colors: [Color.white.opacity(0.65), Panel.ivory], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea())
-        .foregroundStyle(Panel.ink).preferredColorScheme(.light)
+        .background(LinearGradient(colors: [Panel.surface, Panel.ivory], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea())
+        .foregroundStyle(Panel.ink)
     }
 
     private func display(narrow: Bool) -> some View {
@@ -149,7 +160,7 @@ struct ContentView: View {
             .background(RoundedRectangle(cornerRadius: 9).fill(Color(red: 0.075, green: 0.085, blue: 0.08).shadow(.inner(color: .black.opacity(0.85), radius: 7, x: 3, y: 5)))
                 .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(.black.opacity(0.75), lineWidth: 3))
                 .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(LinearGradient(colors: [.black.opacity(0.9), .white.opacity(0.5)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 2))
-                .shadow(color: .white.opacity(0.85), radius: 1, x: 1, y: 2))
+                .shadow(color: Panel.highlight, radius: 1, x: 1, y: 2))
     }
     private func caption(_ text: String) -> some View {
         Text(text).font(.system(size: 10, weight: .medium, design: .monospaced)).tracking(0.6).foregroundStyle(Panel.ink.opacity(0.55))
@@ -202,13 +213,13 @@ private struct HardwareButtonFace<Label: View>: View {
                 RoundedRectangle(cornerRadius: 9)
                     .fill(LinearGradient(colors: selected
                         ? [color.opacity(0.8), color]
-                        : [Color(red: 0.96, green: 0.95, blue: 0.91), Panel.ivory],
+                        : [Panel.surface, Panel.ivory],
                         startPoint: .topLeading, endPoint: .bottomTrailing)
                     .shadow(.inner(color: .white.opacity(pressed ? 0.12 : 0.65), radius: 1, x: 1, y: 1))
                     .shadow(.inner(color: .black.opacity(pressed ? 0.22 : 0.06), radius: pressed ? 4 : 2, x: 1, y: 2)))
                     .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(
                         LinearGradient(colors: [.white.opacity(0.7), .black.opacity(0.14)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1))
-                    .shadow(color: .white.opacity(pressed ? 0 : 0.8), radius: 4, x: -3, y: -3)
+                    .shadow(color: Panel.highlight.opacity(pressed ? 0 : 1), radius: 4, x: -3, y: -3)
                     .shadow(color: .black.opacity(pressed ? 0.08 : 0.24), radius: pressed ? 1 : 5, x: pressed ? 0 : 3, y: pressed ? 1 : 5)
             }
             .brightness(hovered && enabled ? 0.025 : 0)
@@ -238,14 +249,14 @@ private struct Dial: View {
                 }
                 Circle().fill(Panel.ivory.shadow(.inner(color: .black.opacity(0.26), radius: 4, x: 3, y: 4)))
                     .frame(width: 80, height: 80)
-                    .shadow(color: .white.opacity(0.85), radius: 3, x: -2, y: -2)
-                Circle().fill(LinearGradient(colors: [.white, Color(red: 0.72, green: 0.72, blue: 0.68)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .shadow(color: Panel.highlight, radius: 3, x: -2, y: -2)
+                Circle().fill(LinearGradient(colors: [Panel.surface, Panel.ivory], startPoint: .topLeading, endPoint: .bottomTrailing))
                     .frame(width: 71, height: 71)
                     .overlay(Circle().strokeBorder(.white.opacity(0.6), lineWidth: 1))
                     .shadow(color: .black.opacity(0.34), radius: 4, x: 2, y: 5)
                 Circle().fill(LinearGradient(colors: [Color(red: 0.21, green: 0.23, blue: 0.22), .black], startPoint: .topLeading, endPoint: .bottomTrailing)).frame(width: 57, height: 57)
                     .overlay(Circle().strokeBorder(LinearGradient(colors: [.white.opacity(0.22), .black.opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1))
-                Capsule().fill(color == Panel.ink ? Panel.ivory : color).frame(width: 3, height: 16).offset(y: -17).rotationEffect(.degrees(-135 + fraction * 270))
+                Capsule().fill(color == Panel.ink ? Panel.lcd : color).frame(width: 3, height: 16).offset(y: -17).rotationEffect(.degrees(-135 + fraction * 270))
             }.frame(width: 92, height: 94).contentShape(Circle())
                 .gesture(DragGesture(minimumDistance: 0).onChanged { event in
                     if origin == nil { origin = value }

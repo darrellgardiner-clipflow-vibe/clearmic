@@ -12,7 +12,7 @@ let package = Package(
         .executableTarget(name: "ClearMic", dependencies: ["ClearMicAudio", .product(name: "Sparkle", package: "Sparkle")],
                           linkerSettings: [.linkedFramework("AVFoundation"), .linkedFramework("SwiftUI"),
                                            .unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]),
-        .testTarget(name: "ClearMicAudioTests", dependencies: ["ClearMicAudio"])
+        .testTarget(name: "ClearMicAudioTests", dependencies: ["ClearMicAudio", "ClearMic"])
     ],
     cxxLanguageStandard: .cxx17
 )

@@ -94,6 +94,17 @@ open build/ClearMic.app
 The app shows driver/setup status until the driver is installed. Processing
 starts only when requested. A disconnect or sample-rate change stops processing
 with an explanation; reconnect the saved input and press Start again.
+Changing the selected source or channel while processing restarts the route
+with that selection. A new source resets to Input 1; selecting while stopped
+does not start capture. The interface adapts down to 320 points wide and follows
+the system light/dark appearance.
+
+Bluetooth microphones running below 48 kHz are currently unsupported. For
+example, the connected AirPods Pro microphone reports 24 kHz even though its
+headphone output runs at 48 kHz. The source picker marks unsupported rates and
+Start explains the limitation. Use a 48 kHz microphone for capture; selecting
+AirPods as headphone output is a separate route. Sample-rate conversion is
+required before lower-rate microphones can be supported.
 
 ## Architecture and licence
 
