@@ -51,7 +51,7 @@ struct HardwareToggle: ToggleStyle {
                 ZStack(alignment: configuration.isOn ? .trailing : .leading) {
                     Capsule().fill((configuration.isOn ? Panel.orange : Panel.ink.opacity(0.2))
                         .shadow(.inner(color: .black.opacity(0.3), radius: 3, x: 1, y: 2)))
-                    Capsule().fill(LinearGradient(colors: [Panel.surface, Panel.ivory], startPoint: .top, endPoint: .bottom))
+                    Capsule().fill(LinearGradient(colors: [Panel.capTop, Panel.capBottom], startPoint: .top, endPoint: .bottom))
                         .overlay(Capsule().strokeBorder(Panel.highlight, lineWidth: 1))
                         .shadow(color: .black.opacity(0.3), radius: 2, x: 1, y: 2)
                         .frame(width: 23, height: 23).padding(3)

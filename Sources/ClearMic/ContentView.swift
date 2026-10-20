@@ -8,11 +8,14 @@ enum Panel {
         })
     }
     static let ink = adaptive(NSColor(white: 0.18, alpha: 1), NSColor(white: 0.90, alpha: 1))
-    static let ivory = adaptive(NSColor(red: 0.89, green: 0.88, blue: 0.84, alpha: 1), NSColor(white: 0.18, alpha: 1))
-    static let surface = adaptive(NSColor(red: 0.96, green: 0.95, blue: 0.91, alpha: 1), NSColor(white: 0.25, alpha: 1))
-    static let highlight = adaptive(NSColor(white: 1, alpha: 0.8), NSColor(white: 1, alpha: 0.08))
+    static let ivory = adaptive(NSColor(red: 0.89, green: 0.88, blue: 0.84, alpha: 1), NSColor(srgbRed: 0.045, green: 0.05, blue: 0.048, alpha: 1))
+    static let surface = adaptive(NSColor(red: 0.96, green: 0.95, blue: 0.91, alpha: 1), NSColor(srgbRed: 0.075, green: 0.08, blue: 0.077, alpha: 1))
+    static let highlight = adaptive(NSColor(white: 1, alpha: 0.8), NSColor(white: 1, alpha: 0.035))
+    static let capTop = adaptive(NSColor(red: 0.96, green: 0.95, blue: 0.91, alpha: 1), NSColor(srgbRed: 0.15, green: 0.16, blue: 0.155, alpha: 1))
+    static let capBottom = adaptive(NSColor(red: 0.89, green: 0.88, blue: 0.84, alpha: 1), NSColor(srgbRed: 0.095, green: 0.10, blue: 0.097, alpha: 1))
+    static let rim = adaptive(NSColor(white: 1, alpha: 0.65), NSColor(white: 1, alpha: 0.10))
+    static let well = adaptive(NSColor(white: 0.18, alpha: 0.18), NSColor(white: 0, alpha: 0.8))
     static let orange = Color(red: 0.93, green: 0.26, blue: 0.10)
-    static let blue = Color(red: 0.26, green: 0.43, blue: 0.56)
     static let lcd = Color(red: 0.77, green: 0.80, blue: 0.70)
 }
 
@@ -131,7 +134,7 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .background(LinearGradient(colors: [Panel.surface, Panel.ivory], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea())
+        .background(LinearGradient(colors: [Panel.capTop, Panel.capBottom], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea())
         .foregroundStyle(Panel.ink)
     }
 
@@ -220,17 +223,17 @@ private struct HardwareButtonFace<Label: View>: View {
             .foregroundStyle(selected ? Color.white : Panel.ink)
             .background {
                 RoundedRectangle(cornerRadius: 11)
-                    .fill(Panel.ink.opacity(0.18).shadow(.inner(color: .black.opacity(0.25), radius: 3, x: 2, y: 3)))
+                    .fill(Panel.well.shadow(.inner(color: .black.opacity(0.25), radius: 3, x: 2, y: 3)))
                     .padding(-3)
                 RoundedRectangle(cornerRadius: 9)
                     .fill(LinearGradient(colors: selected
                         ? [color.opacity(0.8), color]
-                        : [Panel.surface, Panel.ivory],
+                        : [Panel.capTop, Panel.capBottom],
                         startPoint: .topLeading, endPoint: .bottomTrailing)
-                    .shadow(.inner(color: .white.opacity(pressed ? 0.12 : 0.65), radius: 1, x: 1, y: 1))
+                    .shadow(.inner(color: Panel.rim.opacity(pressed ? 0.25 : 1), radius: 1, x: 1, y: 1))
                     .shadow(.inner(color: .black.opacity(pressed ? 0.22 : 0.06), radius: pressed ? 4 : 2, x: 1, y: 2)))
                     .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(
-                        LinearGradient(colors: [.white.opacity(0.7), .black.opacity(0.14)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1))
+                        LinearGradient(colors: [Panel.rim, .black.opacity(0.4)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1))
                     .shadow(color: Panel.highlight.opacity(pressed ? 0 : 1), radius: 4, x: -3, y: -3)
                     .shadow(color: .black.opacity(pressed ? 0.08 : 0.24), radius: pressed ? 1 : 5, x: pressed ? 0 : 3, y: pressed ? 1 : 5)
             }
@@ -262,9 +265,9 @@ private struct Dial: View {
                 Circle().fill(Panel.ivory.shadow(.inner(color: .black.opacity(0.26), radius: 4, x: 3, y: 4)))
                     .frame(width: 80, height: 80)
                     .shadow(color: Panel.highlight, radius: 3, x: -2, y: -2)
-                Circle().fill(LinearGradient(colors: [Panel.surface, Panel.ivory], startPoint: .topLeading, endPoint: .bottomTrailing))
+                Circle().fill(LinearGradient(colors: [Panel.capTop, Panel.capBottom], startPoint: .topLeading, endPoint: .bottomTrailing))
                     .frame(width: 71, height: 71)
-                    .overlay(Circle().strokeBorder(.white.opacity(0.6), lineWidth: 1))
+                    .overlay(Circle().strokeBorder(Panel.rim, lineWidth: 1))
                     .shadow(color: .black.opacity(0.34), radius: 4, x: 2, y: 5)
                 Circle().fill(LinearGradient(colors: [Color(red: 0.21, green: 0.23, blue: 0.22), .black], startPoint: .topLeading, endPoint: .bottomTrailing)).frame(width: 57, height: 57)
                     .overlay(Circle().strokeBorder(LinearGradient(colors: [.white.opacity(0.22), .black.opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1))

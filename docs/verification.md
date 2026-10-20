@@ -109,3 +109,11 @@ Fourteen tests pass, including four source-switch lifecycle cases. Offscreen
 rendering covers light/dark appearance at 320 through 1080 points. Opening
 menus, VoiceOver, physical presses and actual microphone switching in the
 installed app still require a live user check.
+
+## Dark material revision, 0.1.5
+
+Dark mode uses explicit sRGB near-black case colours, separate charcoal cap
+colours and black button wells. Highlight opacity is reduced throughout the
+buttons, selector edges and dial collars. Light-mode palette values remain
+unchanged. Native light/dark renders at 320 through 1080 points are generated
+by `scripts/render-ui.sh`; this revision changes appearance only.
