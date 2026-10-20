@@ -1,0 +1,107 @@
+# ClearMic for iPhone: Bluetooth route prototype
+
+This is a small experiment for using a paired DJI or other Bluetooth microphone
+before recording with Apple's Camera app. It is not an iOS virtual microphone,
+and it does not deliver ClearMic's macOS effects into Camera.
+
+The app selects an input exposed by iOS audio, verifies the actual route, meters
+a short microphone test, and prepares the session before you switch to Camera.
+Hardware input gain appears only when the current input supports it. No receiver,
+account, cloud service or paid API is used by the app.
+
+A paired accessory must expose a supported microphone input. Playback-only
+Bluetooth devices cannot be used as microphones. Compatibility with arbitrary
+Bluetooth microphones and retention of the route by Camera are unverified.
+DJI documents that direct Bluetooth on Mic Mini supports third-party camera apps,
+not the native Camera app. This prototype tests the reported route-priming workaround.
+
+## Build and install on an iPhone
+
+Requires iOS 17+, Xcode 26+ with its iOS platform component, and a personal Apple
+ID or Apple Developer team for device signing. No signing team is committed.
+
+1. Open `ios/ClearMic.xcodeproj` in Xcode.
+2. Select the **ClearMic-iOS** scheme and the **ClearMic-iOS** target.
+3. Under Signing & Capabilities, select your team. A personal team may require a
+   unique bundle identifier instead of `org.clearmic.ios`.
+4. Connect and unlock the iPhone, trust this Mac if requested, and enable Developer
+   Mode on the phone if Xcode requires it.
+5. Select the iPhone as the run destination and Run.
+
+If Xcode says the iOS platform is not installed, install the matching component
+under Xcode → Settings → Components. The SDK-only artifacts described below do
+not bypass provisioning and cannot be installed unsigned on a normal iPhone.
+
+TestFlight distribution requires a configured Apple Developer team and App Store
+Connect app. This repository does not publish iOS releases or submit apps automatically.
+
+## Test the actual workflow
+
+1. Pair the transmitter directly in iPhone Settings → Bluetooth. No receiver.
+2. In ClearMic, tap Find microphones and allow microphone access.
+3. Select the Bluetooth input. Wait for Input ready and the matching verified name.
+4. Tap Test microphone and speak. The meter must react to the Bluetooth microphone,
+   not just the phone. Stop/reconnect on any mismatch or lost source.
+5. Tap Prepare Camera. The microphone test stops, leaving the audio session prepared.
+6. Switch to Apple's Camera app yourself and record a short video. Put the iPhone
+   farther away and speak close to the Bluetooth mic. Also test touching the phone
+   near its built-in microphones to distinguish which input was actually recorded.
+7. Play the video back. Repeat after stopping/starting a second video, after locking
+   the phone, and after reconnecting the transmitter. Compare once without ClearMic.
+8. Return to ClearMic and use Reconnect & recheck for another attempt. Stop releases
+   its audio session. Share route diagnostics only if you choose to.
+
+Last verified in ClearMic means exactly that. The app cannot inspect Camera's
+recording input, and system route notifications during handoff are not proof of
+what Camera recorded. A real device test is required before claiming success.
+
+## Permissions and temporary audio
+
+Microphone access is requested only on Connect/Find/selection. The level test
+writes at most 30 seconds of mono PCM into the app's temporary directory for
+AVAudioRecorder metering. Stop, handoff, test completion, source loss and errors
+stop the recorder and delete that file. The next app launch also removes a file
+left by a crash. No recordings are exported or uploaded.
+
+There is no playback/monitoring output, Core Bluetooth scan, camera capture,
+photo-library access or background-audio entitlement. Preparing Camera does not
+continue the level test or run a background loop that fights for microphone access.
+
+## Architecture and checks
+
+`RouteCore` owns session state and has an injected `MicrophoneHardware` boundary.
+The iOS adapter owns AVAudioSession, AVAudioRecorder and notifications. It uses
+Apple's recorder rather than a custom Swift render callback. Input selection is
+verified against the actual route after settling. Permission and route requests
+have generation guards; Stop or a newer request cancels stale completion.
+
+Lost inputs and interruptions stop testing and require explicit reconnection.
+They never silently substitute the phone microphone or resume capture. Camera
+handoff is a separate experimental state and never reports Camera input as verified.
+
+```sh
+swift test --package-path ios/RouteCore
+scripts/build-ios-sdk.sh
+```
+
+The SDK build script compiles and links the real app for ARM64 iPhone and ARM64
+simulator using installed SDKs, then checks Mach-O platform/version metadata.
+It does not sign, install, boot a simulator, download a runtime or access microphones.
+Artifacts live in ignored `build/ios-sdk/{iphoneos,iphonesimulator}/ClearMic.app`.
+
+Nine host-run tests cover discovery without automatic selection/capture, permission
+denial and stale permission races, actual-input checks, selected-source loss and
+explicit reconnect, bounded meters/test duration, recording failure, interruptions,
+media reset, gain bounds and Camera handoff without automatically reclaiming input.
+On the development Mac, both SDK targets compile without diagnostics. Normal
+`xcodebuild` is blocked by its missing iOS platform component, and there is no
+simulator runtime or connected iPhone. UI execution, system permission prompts,
+real Bluetooth levels, temporary-file cleanup on-device and Camera route retention
+remain unverified. The macOS app and updater are not changed by this prototype.
+
+## Platform references
+
+- [Apple: selecting a preferred input](https://developer.apple.com/documentation/avfaudio/avaudiosession/setpreferredinput(_:))
+- [Apple: available inputs](https://developer.apple.com/documentation/avfaudio/avaudiosession/availableinputs)
+- [Apple: Bluetooth hands-free inputs](https://developer.apple.com/documentation/avfaudio/avaudiosession/categoryoptions-swift.struct/allowbluetoothhfp)
+- [DJI Mic Mini direct Bluetooth limitations](https://www.dji.com/mic-mini)

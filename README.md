@@ -201,3 +201,11 @@ source-loss and error messages remain visible when needed.
 First-run setup explains microphone access, driver installation and listening.
 The question-mark button reopens setup. Reading the walkthrough does not request
 permissions or start recording. See [design](DESIGN.md) for layout and control states.
+
+## iPhone route prototype
+
+The [iOS prototype](ios/README.md) selects and tests a paired Bluetooth microphone
+with no receiver, then prepares its audio session before you switch to Apple's
+Camera app. It is an experiment in route retention, not an iOS virtual microphone.
+Real Camera compatibility is not yet verified. Open `ios/ClearMic.xcodeproj` for
+device signing and installation; the macOS build and release flow are separate.

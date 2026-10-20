@@ -8,3 +8,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: scripts/check.sh
+      - run: swift test --package-path ios/RouteCore
