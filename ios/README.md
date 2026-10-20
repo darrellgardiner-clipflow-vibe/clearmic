@@ -93,11 +93,12 @@ Nine host-run tests cover discovery without automatic selection/capture, permiss
 denial and stale permission races, actual-input checks, selected-source loss and
 explicit reconnect, bounded meters/test duration, recording failure, interruptions,
 media reset, gain bounds and Camera handoff without automatically reclaiming input.
-On the development Mac, both SDK targets compile without diagnostics. Normal
-`xcodebuild` is blocked by its missing iOS platform component, and there is no
-simulator runtime or connected iPhone. UI execution, system permission prompts,
-real Bluetooth levels, temporary-file cleanup on-device and Camera route retention
-remain unverified. The macOS app and updater are not changed by this prototype.
+Both SDK targets compile without diagnostics. On the Mac mini, the nine route
+tests, normal Xcode simulator build and unsigned Release device archive pass
+with Xcode 26.6 and the installed iOS 26.5 platform. UI execution, system
+permission prompts, real Bluetooth levels, temporary-file cleanup on-device and
+Camera route retention remain unverified. The macOS app and updater are not
+changed by this prototype.
 
 ## Platform references
 
@@ -105,3 +106,24 @@ remain unverified. The macOS app and updater are not changed by this prototype.
 - [Apple: available inputs](https://developer.apple.com/documentation/avfaudio/avaudiosession/availableinputs)
 - [Apple: Bluetooth hands-free inputs](https://developer.apple.com/documentation/avfaudio/avaudiosession/categoryoptions-swift.struct/allowbluetoothhfp)
 - [DJI Mic Mini direct Bluetooth limitations](https://www.dji.com/mic-mini)
+
+## Development host
+
+The active development checkout is `~/Developer/labs/clearmic` on the Mac mini,
+beside Link Inbox. Use the mini for iOS simulator builds and device archives;
+its Xcode installation includes the required iOS platform and simulator runtime.
+The laptop checkout is retained as a copy. No app preferences or signing secrets
+were transferred. Link Inbox's existing signing identities and credential store
+on the mini are the reference for adding ClearMic's own TestFlight release flow.
+ClearMic has not yet been registered or uploaded to App Store Connect.
+
+From this repo on the mini:
+
+```sh
+swift test --package-path ios/RouteCore
+xcodebuild -project ios/ClearMic.xcodeproj -scheme ClearMic-iOS -destination 'generic/platform=iOS Simulator' -configuration Debug -derivedDataPath build/ios-simulator CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project ios/ClearMic.xcodeproj -scheme ClearMic-iOS -destination 'generic/platform=iOS' -configuration Release -derivedDataPath build/ios-device -archivePath build/ClearMic-iOS.xcarchive CODE_SIGNING_ALLOWED=NO archive
+```
+
+The archive is unsigned preparation, not an installable or uploaded TestFlight
+build. Signing/export and the new app record remain separate release steps.
