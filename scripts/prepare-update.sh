@@ -11,5 +11,6 @@ ditto -c -k --sequesterRsrc --keepParent build/ClearMic.app "build/updates/Clear
 .build/artifacts/sparkle/Sparkle/bin/generate_appcast --ed-key-file "$key" \
   --download-url-prefix "https://github.com/darrellgardiner-clipflow-vibe/clearmic/releases/download/v$version/" build/updates
 cp build/updates/appcast.xml Release/appcast.xml
+python3 scripts/normalize-appcast.py Release/appcast.xml
 swift scripts/verify-update.swift Release/public-key.txt Release/appcast.xml "build/updates/ClearMic-$version.zip"
 echo "Prepared signed archive and appcast. Upload the archive to the matching GitHub release before publishing the feed."

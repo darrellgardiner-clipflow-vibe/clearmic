@@ -30,7 +30,10 @@ CLEARMIC_VERSION=0.1.2 CLEARMIC_BUILD=3 scripts/prepare-update.sh
 
 The script creates a signed zip and appcast locally. Review and upload the zip
 to the matching GitHub release, then commit/push Release/appcast.xml. It never
-publishes automatically. The feed must point to an existing uploaded artifact.
+publishes automatically. The feed must point to an existing uploaded artifact. `normalize-appcast.py`
+removes generated delta links because this release workflow uploads full
+archives only, and keeps every full archive under its own versioned release URL.
+It preserves archive sizes and Ed25519 signatures.
 
 Anyone can verify an archive without the private signing key:
 
