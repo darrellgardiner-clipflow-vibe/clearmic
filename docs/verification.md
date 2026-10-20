@@ -52,3 +52,16 @@ app and universal driver on Apple Silicon with Xcode 26.6. Live-driver loading,
 real microphone capture, browser capture, sleep/wake and long-session tests
 have not yet been performed. The driver requires administrator installation;
 the build scripts deliberately do not do that as a test side effect.
+
+## Native UI rendering
+
+Run `scripts/render-ui.sh` to render the actual SwiftUI content at 1080 and
+420 points wide into `build/ui/`. The helper draws its own offscreen hosting
+view, without desktop capture, microphone capture or UI automation. Inspect
+both images for wrapping and control depth. Resize the running app to check
+scrolling, keyboard focus and pressed/hover states; the static renders do not
+prove those interactions.
+
+For 0.1.2, both native renders were inspected, the ten DSP tests passed, and
+the app and driver built with valid local signatures. Physical button press
+and hover behavior remains a manual check in the installed application.
