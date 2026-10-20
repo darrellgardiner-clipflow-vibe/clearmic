@@ -65,3 +65,10 @@ prove those interactions.
 For 0.1.2, both native renders were inspected, the ten DSP tests passed, and
 the app and driver built with valid local signatures. Physical button press
 and hover behavior remains a manual check in the installed application.
+
+The 0.1.3 Load microphone action requests an administrator-authorized normal
+termination of `coreaudiod`, following the upstream driver reload approach,
+instead of the `launchctl kickstart` action rejected by SIP on the test Mac.
+A successful request is not reported as a loaded driver until enumeration
+finds both devices. The command is not run during automated verification;
+its effect on this Mac remains a manual check via Load microphone.

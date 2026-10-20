@@ -156,7 +156,7 @@ final class Session: ObservableObject {
         Task.detached { [self] in
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            process.arguments = ["-e", "do shell script \"/bin/launchctl kickstart -k system/com.apple.audio.coreaudiod\" with administrator privileges"]
+            process.arguments = ["-e", "do shell script \"/usr/bin/killall coreaudiod\" with administrator privileges"]
             let errors = Pipe(); process.standardError = errors
             do {
                 try process.run()
@@ -165,7 +165,13 @@ final class Session: ObservableObject {
                 let detail = String(data: errorData, encoding: .utf8) ?? ""
                 await MainActor.run {
                     self.refreshDevices()
-                    self.message = process.terminationStatus == 0 ? "Audio service reloaded. Choose your input and start processing." : "Audio reload did not complete. \(detail)"
+                    if process.terminationStatus == 0 {
+                        self.message = self.driverInstalled
+                            ? "Virtual microphone loaded. Choose your input and start processing."
+                            : "Audio restart requested. Wait a few seconds, then Start. If ClearMic stays unavailable, restart your Mac once."
+                    } else {
+                        self.message = "Audio reload did not complete. Restart your Mac once to load the installed microphone. No reinstall or security changes are needed. \(detail)"
+                    }
                 }
             } catch {
                 await MainActor.run { self.message = error.localizedDescription }
