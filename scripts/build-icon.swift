@@ -1,6 +1,6 @@
 import AppKit
 
-// Original ClearMic ribbon mark. All geometry lives in a 1024-point canvas.
+// Original ClearMic waveform microphone mark. All geometry lives in a 1024-point canvas.
 // White space, a continuous tile contour and shallow edge relief keep the mark
 // legible in the Dock. Generate each representation directly from the paths.
 let directory = URL(fileURLWithPath: CommandLine.arguments[1])
@@ -25,27 +25,54 @@ func tilePath() -> NSBezierPath {
     return p
 }
 
-func ribbonPath() -> NSBezierPath {
-    // An open C with opposing diagonal terminals: one broad, continuous ribbon.
+func microphonePath() -> NSBezierPath {
+    // One continuous outline: capsule, cradle and foot share their actual edges.
+    // There are no overlapping pieces to leave seams in the inset rim.
     let p = NSBezierPath()
-    p.move(to: NSPoint(x: 732, y: 768))
-    p.line(to: NSPoint(x: 504, y: 768))
-    p.curve(to: NSPoint(x: 270, y: 534), controlPoint1: NSPoint(x: 352, y: 768), controlPoint2: NSPoint(x: 270, y: 686))
-    p.line(to: NSPoint(x: 270, y: 490))
-    p.curve(to: NSPoint(x: 504, y: 256), controlPoint1: NSPoint(x: 270, y: 338), controlPoint2: NSPoint(x: 352, y: 256))
-    p.line(to: NSPoint(x: 732, y: 256))
-    p.curve(to: NSPoint(x: 744, y: 284), controlPoint1: NSPoint(x: 750, y: 256), controlPoint2: NSPoint(x: 756, y: 272))
-    p.line(to: NSPoint(x: 626, y: 400))
-    p.curve(to: NSPoint(x: 598, y: 412), controlPoint1: NSPoint(x: 618, y: 408), controlPoint2: NSPoint(x: 608, y: 412))
-    p.line(to: NSPoint(x: 514, y: 412))
-    p.curve(to: NSPoint(x: 426, y: 500), controlPoint1: NSPoint(x: 456, y: 412), controlPoint2: NSPoint(x: 426, y: 442))
-    p.line(to: NSPoint(x: 426, y: 524))
-    p.curve(to: NSPoint(x: 514, y: 612), controlPoint1: NSPoint(x: 426, y: 582), controlPoint2: NSPoint(x: 456, y: 612))
-    p.line(to: NSPoint(x: 598, y: 612))
-    p.curve(to: NSPoint(x: 626, y: 624), controlPoint1: NSPoint(x: 608, y: 612), controlPoint2: NSPoint(x: 618, y: 616))
-    p.line(to: NSPoint(x: 744, y: 740))
-    p.curve(to: NSPoint(x: 732, y: 768), controlPoint1: NSPoint(x: 756, y: 752), controlPoint2: NSPoint(x: 750, y: 768))
+    p.move(to: NSPoint(x: 512, y: 800))
+    p.curve(to: NSPoint(x: 640, y: 672), controlPoint1: NSPoint(x: 590, y: 800), controlPoint2: NSPoint(x: 640, y: 750))
+    p.line(to: NSPoint(x: 640, y: 524))
+    p.curve(to: NSPoint(x: 544, y: 396), controlPoint1: NSPoint(x: 640, y: 442), controlPoint2: NSPoint(x: 544, y: 430))
+    p.line(to: NSPoint(x: 544, y: 358))
+    p.curve(to: NSPoint(x: 672, y: 516), controlPoint1: NSPoint(x: 624, y: 370), controlPoint2: NSPoint(x: 672, y: 425))
+    p.line(to: NSPoint(x: 672, y: 548))
+    p.curve(to: NSPoint(x: 736, y: 548), controlPoint1: NSPoint(x: 672, y: 590), controlPoint2: NSPoint(x: 736, y: 590))
+    p.line(to: NSPoint(x: 736, y: 516))
+    p.curve(to: NSPoint(x: 554, y: 292), controlPoint1: NSPoint(x: 736, y: 389), controlPoint2: NSPoint(x: 666, y: 309))
+    p.line(to: NSPoint(x: 554, y: 270))
+    p.curve(to: NSPoint(x: 582, y: 242), controlPoint1: NSPoint(x: 554, y: 251), controlPoint2: NSPoint(x: 563, y: 242))
+    p.line(to: NSPoint(x: 612, y: 242))
+    p.curve(to: NSPoint(x: 612, y: 194), controlPoint1: NSPoint(x: 644, y: 242), controlPoint2: NSPoint(x: 644, y: 194))
+    p.line(to: NSPoint(x: 412, y: 194))
+    p.curve(to: NSPoint(x: 412, y: 242), controlPoint1: NSPoint(x: 380, y: 194), controlPoint2: NSPoint(x: 380, y: 242))
+    p.line(to: NSPoint(x: 442, y: 242))
+    p.curve(to: NSPoint(x: 470, y: 270), controlPoint1: NSPoint(x: 461, y: 242), controlPoint2: NSPoint(x: 470, y: 251))
+    p.line(to: NSPoint(x: 470, y: 292))
+    p.curve(to: NSPoint(x: 288, y: 516), controlPoint1: NSPoint(x: 358, y: 309), controlPoint2: NSPoint(x: 288, y: 389))
+    p.line(to: NSPoint(x: 288, y: 548))
+    p.curve(to: NSPoint(x: 352, y: 548), controlPoint1: NSPoint(x: 288, y: 590), controlPoint2: NSPoint(x: 352, y: 590))
+    p.line(to: NSPoint(x: 352, y: 516))
+    p.curve(to: NSPoint(x: 480, y: 358), controlPoint1: NSPoint(x: 352, y: 425), controlPoint2: NSPoint(x: 400, y: 370))
+    p.line(to: NSPoint(x: 480, y: 396))
+    p.curve(to: NSPoint(x: 384, y: 524), controlPoint1: NSPoint(x: 480, y: 430), controlPoint2: NSPoint(x: 384, y: 442))
+    p.line(to: NSPoint(x: 384, y: 672))
+    p.curve(to: NSPoint(x: 512, y: 800), controlPoint1: NSPoint(x: 384, y: 750), controlPoint2: NSPoint(x: 434, y: 800))
     p.close()
+    return p
+}
+
+func waveformPath(pixels: Int) -> NSBezierPath {
+    let p = NSBezierPath()
+    p.move(to: NSPoint(x: 354, y: 604))
+    p.line(to: NSPoint(x: 438, y: 604))
+    p.line(to: NSPoint(x: 466, y: 642))
+    p.line(to: NSPoint(x: 504, y: 550))
+    p.line(to: NSPoint(x: 546, y: 658))
+    p.line(to: NSPoint(x: 580, y: 604))
+    p.line(to: NSPoint(x: 670, y: 604))
+    p.lineJoinStyle = .round
+    p.lineCapStyle = .round
+    p.lineWidth = pixels <= 32 ? 32 : 24
     return p
 }
 
@@ -69,7 +96,16 @@ func drawIcon(pixels: Int) {
     tile.stroke()
     NSGraphicsContext.restoreGraphicsState()
 
-    let mark = ribbonPath()
+    NSGraphicsContext.saveGraphicsState()
+    let tilt = NSAffineTransform()
+    tilt.translateX(by: 512, yBy: 504)
+    tilt.rotate(byDegrees: -12)
+    tilt.translateX(by: -512, yBy: -504)
+    tilt.concat()
+    let context = NSGraphicsContext.current!.cgContext
+    // Isolate the mark: waveform knockout exposes the tile, never the desktop.
+    context.beginTransparencyLayer(auxiliaryInfo: nil)
+    let mark = microphonePath()
     NSGraphicsContext.saveGraphicsState()
     let relief = NSShadow()
     relief.shadowColor = color(0.47, 0.08, 0.015, 0.16)
@@ -95,6 +131,11 @@ func drawIcon(pixels: Int) {
         highlight.stroke()
         NSGraphicsContext.restoreGraphicsState()
     }
+    context.setBlendMode(.clear)
+    waveformPath(pixels: pixels).stroke()
+    context.setBlendMode(.normal)
+    context.endTransparencyLayer()
+    NSGraphicsContext.restoreGraphicsState()
 }
 
 for size in [16, 32, 128, 256, 512] {
