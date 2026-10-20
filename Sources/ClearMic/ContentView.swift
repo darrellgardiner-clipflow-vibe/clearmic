@@ -107,13 +107,8 @@ struct ContentView: View {
                 }
             }
             .padding(28)
-            .background(RoundedRectangle(cornerRadius: 18)
-                .fill(LinearGradient(colors: [Color.white.opacity(0.65), Panel.ivory], startPoint: .topLeading, endPoint: .bottomTrailing))
-                .shadow(color: .black.opacity(0.2), radius: 12, x: 0, y: 10)
-                .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(.white.opacity(0.8), lineWidth: 1)))
-            .padding(18)
         }
-        .background(Color(red: 0.72, green: 0.73, blue: 0.71))
+        .background(LinearGradient(colors: [Color.white.opacity(0.65), Panel.ivory], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea())
         .foregroundStyle(Panel.ink).preferredColorScheme(.light)
     }
 

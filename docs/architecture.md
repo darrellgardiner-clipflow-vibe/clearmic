@@ -28,9 +28,9 @@ stops through `stop()`. The UI never coordinates Core Audio resource creation.
 ## Audio path
 
 1. Resolve the selected physical source, `ClearMic_UID` and `ClearMic_2_UID`.
-2. Validate 48 kHz and the source channel. Create a private stacked aggregate
+2. Validate 48 kHz and the source channel. Create a private aggregate
    with the source first and hidden send second. Source is the clock master;
-   send has drift compensation enabled.
+   send has drift compensation enabled. The aggregate uses `stacked = false`.
 3. Validate stream format and complete input/output channel counts before I/O.
 4. The C++ IOProc clears output buffers, selects one input channel, processes
    mono, and writes it only to the two send channels. Physical output channels
@@ -38,8 +38,11 @@ stops through `stop()`. The UI never coordinates Core Audio resource creation.
    float buffers are supported.
 5. The driver makes those two equal channels readable as the ClearMic input.
 
-`stacked = true` is required. The SDK documents `false` as mirroring output
-streams, which could put microphone audio on physical outputs.
+Live probing on macOS 26 found that `stacked = true` creates an output-only
+device and drops the physical input streams. `false` preserves input and
+separate output streams. The SDK's terse comment led the initial design review
+to the wrong conclusion. The route probe now uses the application's actual
+configuration and checks the resulting channel counts before any I/O starts.
 
 The process-private aggregate disappears on process exit. The installed public
 microphone remains. The app never changes system default devices or silently
@@ -85,5 +88,5 @@ The first build still needs live driver installation, browser capture and
 endurance verification. Developer ID signing/notarization are distribution
 prerequisites. Device changes are polled every two seconds and currently require
 a manual restart of processing after disconnect. Monitoring output must also
-run at 48 kHz. These limits must not be described as passed tests or finished
+be convertible to the aggregate's 48 kHz stream. These limits must not be described as passed tests or finished
 release behavior.

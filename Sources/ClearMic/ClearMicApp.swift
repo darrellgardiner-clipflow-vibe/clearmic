@@ -20,6 +20,7 @@ struct ClearMicApp: App {
                 .frame(minWidth: 980, minHeight: 710)
         }
         .defaultSize(width: 1080, height: 800)
+        .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") { updater.check() }.disabled(!updater.canCheck)

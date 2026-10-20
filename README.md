@@ -36,7 +36,7 @@ git clone https://github.com/darrellgardiner-clipflow-vibe/clearmic.git
 cd clearmic
 scripts/check.sh
 scripts/package.sh
-open build/ClearMic-0.1.0.pkg
+open build/ClearMic-0.1.1.pkg
 ```
 
 1. Quit recording/call apps, then run the installer. macOS asks for administrator
@@ -63,8 +63,9 @@ With a PodMic USB through XLR, leave its own USB-C cable disconnected. If an
 inline phantom-powered booster is in the XLR path, power it according to its
 manufacturer's instructions. The Solo's Direct monitor is the raw hardware
 signal. To hear ClearMic effects, choose its headphone output in the app, enable
-**Listen**, and set the Solo to **USB** monitoring. Use wired headphones to avoid
-feedback and Bluetooth delay. Listen starts off at launch and defaults to
+**Listen**, and set the Solo to **USB** monitoring. Listen starts processing
+automatically. Use wired headphones to avoid feedback and Bluetooth delay.
+Listen starts off at launch and defaults to
 −18 dB. It can run before the virtual driver is installed.
 
 Avoid applying a second voice-enhancement/automatic-gain chain in the receiving

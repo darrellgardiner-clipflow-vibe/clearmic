@@ -3,6 +3,7 @@ import AppKit
 import ClearMicAudio
 import Combine
 import Foundation
+import OSLog
 
 struct VoiceSettings: Codable, Equatable {
     var sourceUID = ""
@@ -50,7 +51,7 @@ final class Session: ObservableObject {
             if oldValue.sourceUID != settings.sourceUID || oldValue.channel != settings.channel {
                 stop()
             } else if oldValue.monitorUID != settings.monitorUID || oldValue.monitoring != settings.monitoring {
-                let resume = running
+                let resume = running || settings.monitoring
                 stop()
                 if resume { Task { await start() } }
             } else { route?.update(settings.controls) }
@@ -71,10 +72,12 @@ final class Session: ObservableObject {
     private var ticks = 0
     private var lastFrameCount: UInt64 = 0
     private var stalledTicks = 0
+    private let logger = Logger(subsystem: "org.clearmic.app", category: "Audio")
 
     var selectedDevice: AudioDevice? { devices.first { $0.uid == settings.sourceUID } }
     var selectedMonitor: AudioDevice? { outputs.first { $0.uid == settings.monitorUID } }
-    var canStart: Bool { (driverInstalled || (settings.monitoring && selectedMonitor != nil)) && selectedDevice != nil && !starting }
+    var canStart: Bool { selectedDevice != nil && !starting }
+    var listening: Bool { running && route?.monitorID != nil }
 
     private init() {
         settings = VoiceSettings.load(UserDefaults.standard.data(forKey: "voiceSettings"))
@@ -123,8 +126,12 @@ final class Session: ObservableObject {
                                    monitor: settings.monitoring ? selectedMonitor : nil, controls: settings.controls)
             running = true
             lastFrameCount = 0; stalledTicks = 0
-            message = driverInstalled ? "Select ClearMic as the microphone in Riverside or your call app." : "Monitoring only. Install the virtual microphone to send this sound to Riverside."
-        } catch { message = error.localizedDescription }
+            message = driverInstalled ? "Select ClearMic as the microphone in Riverside or your call app." : settings.monitoring ? "Listening to processed voice. Install the virtual mic for Riverside." : "Input is active. Turn on Listen to hear your voice, or install the virtual mic for Riverside."
+            logger.notice("Audio capture started; monitoring=\(self.listening), virtualMic=\(self.driverInstalled)")
+        } catch {
+            message = error.localizedDescription
+            logger.error("Audio route failed: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     func stop() {
@@ -191,7 +198,7 @@ final class Session: ObservableObject {
             reductionDB = values.reductionDB
             stalledTicks = values.processedFrames == lastFrameCount ? stalledTicks + 1 : 0
             lastFrameCount = values.processedFrames
-            if values.routingErrors > 0 || stalledTicks > 30 {
+            if stalledTicks > 30 {
                 stop()
                 message = "The audio stream stopped delivering valid buffers. Check the interface and start again."
             }

@@ -11,13 +11,14 @@ ditto .build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sp
 scripts/build-driver.sh
 python3 scripts/package-component.py driver
 python3 - "$app" <<'PY'
-import os, pathlib, plistlib, sys
+import json, os, pathlib, plistlib, sys
 app = pathlib.Path(sys.argv[1])
+release = json.loads(pathlib.Path('Release/version.json').read_text())
 info = {
     'CFBundleIdentifier': 'org.clearmic.app',
     'CFBundleExecutable': 'ClearMic', 'CFBundleName': 'ClearMic',
-    'CFBundlePackageType': 'APPL', 'CFBundleVersion': os.environ.get('CLEARMIC_BUILD', '1'),
-    'CFBundleShortVersionString': os.environ.get('CLEARMIC_VERSION', '0.1.0'),
+    'CFBundlePackageType': 'APPL', 'CFBundleVersion': os.environ.get('CLEARMIC_BUILD', release['build']),
+    'CFBundleShortVersionString': os.environ.get('CLEARMIC_VERSION', release['version']),
     'LSMinimumSystemVersion': '14.0', 'NSPrincipalClass': 'NSApplication',
     'NSMicrophoneUsageDescription': 'ClearMic processes your selected microphone locally for recording and calls.',
     'SUFeedURL': 'https://raw.githubusercontent.com/darrellgardiner-clipflow-vibe/clearmic/main/Release/appcast.xml',

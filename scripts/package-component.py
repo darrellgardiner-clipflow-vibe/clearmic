@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Build fixed-location packages; never relocate into a developer's build folder."""
+import json
 import os
 import pathlib
 import plistlib
@@ -11,7 +12,7 @@ root = pathlib.Path(__file__).resolve().parent.parent
 mode = sys.argv[1]
 if mode not in {"driver", "all"}:
     raise SystemExit("Expected driver or all")
-version = os.environ.get("CLEARMIC_VERSION", "0.1.0")
+version = os.environ.get("CLEARMIC_VERSION", json.loads((root / "Release/version.json").read_text())["version"])
 output = (root / "build/ClearMic.app/Contents/Resources/ClearMicDriver.pkg" if mode == "driver"
           else root / f"build/ClearMic-{version}.pkg")
 with tempfile.TemporaryDirectory(prefix="clearmic-package-") as temporary:

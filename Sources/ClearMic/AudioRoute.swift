@@ -15,6 +15,23 @@ enum AudioHardware {
     static let microphoneUID = "ClearMic_UID"
     static let sendUID = "ClearMic_2_UID"
 
+    static func aggregateDescription(sourceUID: String, sendUID: String?, monitorUID: String?) -> [String: Any] {
+        var subdevices: [[String: Any]] = [[kAudioSubDeviceUIDKey: sourceUID, kAudioSubDeviceDriftCompensationKey: 0]]
+        if let sendUID { subdevices.append([kAudioSubDeviceUIDKey: sendUID, kAudioSubDeviceDriftCompensationKey: 1]) }
+        if let monitorUID, monitorUID != sourceUID {
+            subdevices.append([kAudioSubDeviceUIDKey: monitorUID, kAudioSubDeviceDriftCompensationKey: 1])
+        }
+        return [
+            kAudioAggregateDeviceUIDKey: "org.clearmic.route.\(UUID().uuidString)",
+            kAudioAggregateDeviceNameKey: "ClearMic processing",
+            kAudioAggregateDeviceIsPrivateKey: true,
+            // On macOS 26, true creates a multi-output device with no input streams.
+            kAudioAggregateDeviceIsStackedKey: false,
+            kAudioAggregateDeviceMainSubDeviceKey: sourceUID,
+            kAudioAggregateDeviceSubDeviceListKey: subdevices
+        ]
+    }
+
     static func address(_ selector: AudioObjectPropertySelector,
                         scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal) -> AudioObjectPropertyAddress {
         AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain)
@@ -129,32 +146,22 @@ final class AudioRoute {
             throw RouteError("Set your interface to 48,000 Hz in Audio MIDI Setup before starting. ClearMic does not change hardware settings.")
         }
         let hasVirtual = AudioHardware.resolve(AudioHardware.microphoneUID) != nil && AudioHardware.resolve(AudioHardware.sendUID) != nil
-        guard hasVirtual || monitor != nil else {
-            throw RouteError("Install the ClearMic virtual microphone, then restart your Mac to load it.")
-        }
         if let monitor {
-            guard monitor.outputChannels > 0, monitor.sampleRate == 48000, monitor.uid != AudioHardware.microphoneUID,
+            guard monitor.outputChannels > 0, monitor.uid != AudioHardware.microphoneUID,
                   monitor.uid != AudioHardware.sendUID else {
-                throw RouteError("Choose a 48 kHz headphone output for monitoring. Bluetooth may add noticeable delay.")
+                throw RouteError("Choose an available headphone output. Bluetooth may add noticeable delay.")
             }
         }
         do {
-            var subdevices: [[String: Any]] = [[kAudioSubDeviceUIDKey: source.uid, kAudioSubDeviceDriftCompensationKey: 0]]
-            if hasVirtual { subdevices.append([kAudioSubDeviceUIDKey: AudioHardware.sendUID, kAudioSubDeviceDriftCompensationKey: 1]) }
             let separateMonitor = monitor != nil && monitor!.uid != source.uid
-            if let monitor, separateMonitor { subdevices.append([kAudioSubDeviceUIDKey: monitor.uid, kAudioSubDeviceDriftCompensationKey: 1]) }
-            let description: [String: Any] = [
-                kAudioAggregateDeviceUIDKey: "org.clearmic.route.\(UUID().uuidString)",
-                kAudioAggregateDeviceNameKey: "ClearMic processing",
-                kAudioAggregateDeviceIsPrivateKey: true,
-                // Stack channels, rather than mirror mic audio to the physical output.
-                kAudioAggregateDeviceIsStackedKey: true,
-                kAudioAggregateDeviceMainSubDeviceKey: source.uid,
-                kAudioAggregateDeviceSubDeviceListKey: subdevices
-            ]
+            let description = AudioHardware.aggregateDescription(sourceUID: source.uid,
+                                                                 sendUID: hasVirtual ? AudioHardware.sendUID : nil,
+                                                                 monitorUID: monitor?.uid)
             try AudioHardware.check(AudioHardwareCreateAggregateDevice(description as CFDictionary, &aggregate), "Create audio route")
             try AudioHardware.validateFloatStreams(aggregate, scope: kAudioDevicePropertyScopeInput)
-            try AudioHardware.validateFloatStreams(aggregate, scope: kAudioDevicePropertyScopeOutput)
+            if AudioHardware.channels(aggregate, scope: kAudioDevicePropertyScopeOutput) > 0 {
+                try AudioHardware.validateFloatStreams(aggregate, scope: kAudioDevicePropertyScopeOutput)
+            }
             let extraInputs = separateMonitor ? monitor!.inputChannels : 0
             let virtualChannels = hasVirtual ? 2 : 0
             let extraOutputs = separateMonitor ? monitor!.outputChannels : 0

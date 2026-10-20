@@ -14,6 +14,13 @@ permission, driver loading, correct clock behavior or Riverside capture.
 
 ## Live user journey
 
+`scripts/probe-route.sh` lists devices and IDs. Pass an input ID and optional
+output IDs to check the app's real route configuration without starting capture.
+On the development Mac, the USB codec input plus its stereo output and AirPods
+produced 2 input / 4 independently addressed output channels. An input-only
+route is checked separately. These probes caught and reproduce the initial
+multi-output-versus-aggregate configuration bug.
+
 Prerequisites: installed ClearMic driver loaded after restart, microphone
 permission, a physical 48 kHz source, headphones, and a browser with Riverside.
 
