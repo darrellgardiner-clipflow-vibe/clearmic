@@ -16,6 +16,11 @@ spec.loader.exec_module(release)
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_environment_credentials_need_no_private_library(self):
+        with patch.dict(release.os.environ, {'TEAM_ID': 'test-team', 'ASC_KEY_ID': 'test-key'}, clear=True), patch.object(release.importlib, 'import_module') as imported:
+            self.assertEqual(release.credentials('TEAM_ID', 'ASC_KEY_ID'), {'TEAM_ID': 'test-team', 'ASC_KEY_ID': 'test-key'})
+            imported.assert_not_called()
+
     def test_failed_command_redacts_credentials_in_persisted_log_and_exception(self):
         with tempfile.TemporaryDirectory() as directory, patch.object(release, 'OUTPUT', Path(directory)), patch.object(release.subprocess, 'run', return_value=types.SimpleNamespace(returncode=1, stdout='failed secret-value at private-key-path')):
             with self.assertRaises(RuntimeError) as error:

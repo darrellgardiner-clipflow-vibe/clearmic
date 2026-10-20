@@ -34,7 +34,8 @@ with tempfile.TemporaryDirectory(prefix="clearmic-package-") as temporary:
         component["BundleHasStrictIdentifier"] = True
     with components.open("wb") as stream:
         plistlib.dump(info, stream)
-    subprocess.run(["pkgbuild", "--root", str(payload), "--component-plist", str(components),
+    signing = ["--sign", os.environ["CLEARMIC_INSTALLER_IDENTITY"], "--timestamp"] if os.environ.get("CLEARMIC_INSTALLER_IDENTITY") else []
+    subprocess.run(["pkgbuild", *signing, "--root", str(payload), "--component-plist", str(components),
                     "--identifier", "org.clearmic.driver" if mode == "driver" else "org.clearmic.installer",
                     "--version", version, "--install-location", "/", "--ownership", "recommended",
                     str(output)], check=True)

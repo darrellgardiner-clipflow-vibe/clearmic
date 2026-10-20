@@ -229,3 +229,51 @@ buffers. Missing blend input produces silent outputs and a routing error.
 Static layout and injected-boundary checks do not prove live window dragging,
 VoiceOver, actual permission dialogs, a completed installed-app update or physical
 audio capture. Those remain user journeys to verify in the installed application.
+
+## Public-beta acceptance gate
+
+Record the exact source SHA and installer checksum with each result. The following
+remain **pending** until exercised on a test Mac; offline tests do not satisfy them.
+
+- Fresh download and installation under normal Gatekeeper settings without Xcode.
+  Confirm the app/driver appear and system default audio devices stay unchanged.
+- First launch, denied microphone access, permission recovery and reopened setup.
+- Explicit driver loading after ending calls; no restart from the installer itself.
+- Physical 48 kHz capture into a browser recorder and a call app. Confirm audible
+  processing, dry bypass, mute and silence after Stop/Quit; preserve private audio locally.
+- Wired-headphone Listen at low volume; no automatic physical-speaker monitoring.
+- Source unplug/reconnect, sample-rate mismatch, sleep/wake and no silent fallback.
+- At least a one-hour recording with controls changing: listen for clicks,
+  dropouts and drift, and note CPU load and the exact hardware/software combination.
+- An installed previous release updates through Sparkle, retaining saved voices,
+  preferences and driver. Confirm the update opens and audio still flows.
+- Uninstall the app and only ClearMic's driver, restart, and confirm the virtual
+  input is gone while unrelated drivers remain. Reinstall and check preferences.
+- Exercise Apple Silicon and Intel separately before claiming both are supported;
+  verify the oldest supported macOS version and a current macOS release.
+
+Only a local test Mac with explicit installer approval should be modified. Do not
+restart Core Audio or install/remove drivers as part of automated checks.
+
+## Public-beta preparation, 0.1.9
+
+Local verification on Apple Silicon: 33 DSP/session tests, 9 iOS route tests,
+6 iOS release-tool tests, 4 macOS release refusal tests and the appcast test passed.
+Host app and universal driver builds passed. A separate universal app/driver
+installer was built and expanded without installation; both architecture slices,
+fixed payload paths, version 0.1.9 (10), audio-input entitlement, nested signatures,
+licence resources and absence of installer scripts/upstream branded icon were checked.
+The native UI fixture at 740 points and original icon were visually inspected.
+
+SwiftPM's first binary-artifact download stalled on this host. The exact pinned
+Sparkle 2.10.0 archive was downloaded with curl, its SHA-256 matched against the
+upstream package manifest, and SwiftPM's artifact cache was populated before
+rerunning the checks. No dependency version or checksum was changed. A fully
+unassisted first download on a fresh Mac remains unverified.
+
+Independent static review found and resolved the macOS Bash empty-array issue
+and missing hardened-runtime audio entitlement. Packaging inspection also caught
+and corrected lipo argument ordering in release preparation and preview CI.
+Developer ID Installer identity and a configured notarization profile remain
+prerequisites; no notarization, driver installation, Core Audio restart, live
+capture or installed-app update was performed. No public release/feed was changed.

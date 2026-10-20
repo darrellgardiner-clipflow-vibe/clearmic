@@ -22,14 +22,19 @@ ARCHIVE = OUTPUT / 'ClearMic.xcarchive'
 
 
 def credentials(*names):
+    values = {name: os.environ[name] for name in names if os.environ.get(name)}
+    missing = [name for name in names if name not in values]
+    if not missing:
+        return values
     override = os.environ.get('STUDIO_LIB_PATH')
     candidates = [Path(override).expanduser()] if override else [p / 'lib' for p in ROOT.parents]
     library = next((p for p in candidates if (p / 'studio/credentials.py').is_file()), None)
     if library is None:
-        raise RuntimeError('Studio credential library is unavailable. Set STUDIO_LIB_PATH on the signing host.')
+        raise RuntimeError('Set release environment variables: ' + ', '.join(missing) + '. STUDIO_LIB_PATH is an optional maintainer fallback.')
     sys.path.insert(0, str(library))
     module = importlib.import_module('studio.credentials')
-    return {name: module.require(name).reveal() for name in names}
+    values.update({name: module.require(name).reveal() for name in missing})
+    return values
 
 
 def run(args, label, values=None):

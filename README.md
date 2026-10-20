@@ -4,9 +4,39 @@ A native macOS app that shapes your microphone before it reaches Riverside,
 your podcast recorder, or a call. Select your interface, adjust the voice,
 and choose **ClearMic** as the microphone in the receiving app.
 
-ClearMic is an early GPLv3 prototype. It builds an app and a virtual-microphone
-driver from source. It is not yet a signed, notarized consumer release.
-Hardware/browser validation and long-session testing are still required.
+**[Download the latest preview](https://github.com/darrellgardiner-clipflow-vibe/clearmic/releases/latest)** · [Getting started](docs/getting-started.md) · [Contributing](CONTRIBUTING.md)
+
+Free, open-source microphone processing for **macOS 14+**, using a **48 kHz
+microphone**. Audio stays on your Mac. No account or subscription.
+
+**Preview status:** existing downloads are ad-hoc signed and not notarized.
+They are intended for testers, and macOS may block installation. A signed public
+beta is being prepared; hardware compatibility and long-session testing remain
+incomplete. Do not disable Gatekeeper or System Integrity Protection.
+
+<details>
+<summary>See the ClearMic interface</summary>
+
+<img src="docs/images/clearmic-preview.png" alt="ClearMic microphone controls, level meters, voice EQ and saved voices in dark appearance" width="520">
+
+Native interface rendered with example devices and saved voices; this is not a live microphone test.
+
+</details>
+
+## Install and use
+
+1. Download the `.pkg` installer from the release above. Quit audio apps and
+   install it. Administrator permission is needed for the virtual microphone.
+2. Open **ClearMic** from Applications. Follow setup, select your physical
+   microphone and channel, then press **Start processing** and allow microphone
+   access. If prompted to load the driver, close calls/recordings first: that
+   explicit action briefly restarts macOS audio. Restarting your Mac is an alternative.
+3. Choose **ClearMic** as the microphone in your recording or call app.
+   Keep its speaker/headphone output set to your usual device.
+
+No developer tools are needed to use a downloaded installer. See
+[getting started](docs/getting-started.md) for listening, permissions and troubleshooting,
+and [uninstalling](docs/getting-started.md#uninstall) to remove it.
 
 ## What it does
 
@@ -25,39 +55,24 @@ application/system audio, mix several sources, record files, host Audio Unit
 plug-ins, or mix application playback. It replaces the microphone-processing
 workflow, rather than the full feature sets of Audio Hijack and Loopback.
 
-## Setup
+## Build from source
 
-Requires macOS 14 or later, Xcode Command Line Tools with Swift 5.9 or newer,
-and the full Xcode tools for installer/signing work. The app builds for the host
-architecture; the driver builds for Apple Silicon and Intel.
+Developers need macOS 14+, Swift 5.9+ and Xcode tools. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for a clean-clone setup and checks.
+Local builds are ad-hoc signed; they are not notarized public releases.
 
 ```sh
 git clone https://github.com/darrellgardiner-clipflow-vibe/clearmic.git
 cd clearmic
 scripts/check.sh
 scripts/package.sh
-open build/ClearMic-0.1.1.pkg
+open build
 ```
 
-1. Quit recording/call apps, then run the installer. macOS asks for administrator
-   authentication because the driver installs into `/Library/Audio/Plug-Ins/HAL`.
-2. Open ClearMic and click **Load microphone** if the driver is not loaded.
-   This requests administrator authentication and briefly restarts macOS audio.
-   A full reboot is a fallback, not the normal requirement. The installer never
-   restarts audio or the Mac automatically.
-3. Open `/Applications/ClearMic.app`. Allow microphone access when you press Start.
-4. Choose your hardware microphone/interface and the correct channel. For an
-   M-Track Solo XLR microphone, select **USB AUDIO CODEC**, **Input 1**.
-5. Set the interface to **48,000 Hz** in Audio MIDI Setup if needed, then press
-   **Start processing**. ClearMic does not change the hardware sample rate.
-6. In Riverside or your call app, select **ClearMic** as the microphone. Keep
-   headphones/speaker output set to your usual device.
-
-The local development app/driver use ad-hoc signatures. The installer is unsigned
-and unnotarized. macOS may require explicit approval in Privacy & Security.
-Keep Gatekeeper and System Integrity Protection enabled. Public binary releases
-will need Developer ID signing and notarization before they can be described as
-ready for general installation.
+The generated `ClearMic-<version>.pkg` contains the app and driver. Local app
+builds target the host architecture; the public release command builds a
+universal Apple Silicon/Intel app and driver. Intel execution still needs
+verification before advertising compatibility.
 
 With a PodMic USB through XLR, leave its own USB-C cable disconnected. If an
 inline phantom-powered booster is in the XLR path, power it according to its

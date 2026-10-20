@@ -191,3 +191,13 @@ removed after successful setup. A password-protected identity backup remains in
 the owner-only signing directory. The generated keychain password is stored under
 ClearMic-specific names in the existing owner-only studio device credential file.
 The release export explicitly selects this certificate and profile.
+
+## Portable release configuration
+
+Other maintainers can provide the environment variables named above directly;
+no private studio library is required when all requested variables are present.
+`STUDIO_LIB_PATH` remains an optional fallback for the original maintainer.
+Use your own bundle identifier, App Store Connect app and signing configuration
+in `ios/Release.json`. The signing-setup helper is specific to the original
+maintainer; external contributors should configure signing in Xcode.
+The experimental iPhone workflow is separate from the macOS public beta.
