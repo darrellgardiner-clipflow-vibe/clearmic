@@ -90,3 +90,25 @@ prerequisites. Device changes are polled every two seconds and currently require
 a manual restart of processing after disconnect. Monitoring output must also
 be convertible to the aggregate's 48 kHz stream. These limits must not be described as passed tests or finished
 release behavior.
+
+## Speech denoiser
+
+The 48 kHz processor owns an RNNoise v0.2 state allocated before I/O starts.
+Its compiled model and tables are immutable; each route has separate state.
+The chain is input trim → optional RNNoise blend → high-pass/EQ → compressor
+→ output gain/limiter. Bypass selects the original sample and Mute wins.
+
+Fixed 480-sample input/output arrays bridge arbitrary callback sizes to the
+model frame size. Float amplitudes are scaled to/from the library's PCM units.
+The model runs continuously while the route is active; enabling cleanup
+ramps its mix over 50 ms without allocating or resetting the model in the
+callback. Disabling cleanup returns to the original undelayed path. This
+transition blends signals with different delay briefly; final listening
+quality and Bluetooth latency remain live verification requirements.
+
+The processor reads the cleanup flag in the same coherent atomic snapshot
+as the other controls. Models, buffers and library state are destroyed only
+after the audio callback has stopped. Neither the render loop nor the model
+frame-processing call performs file access, allocation, logging or locking.
+The bundled source/model provenance and compatibility shim are documented
+in vendor/RNNoise/PROVENANCE.md.

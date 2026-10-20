@@ -15,6 +15,7 @@ struct VoiceSettings: Codable, Equatable {
     var threshold = -18.0
     var ratio = 3.0
     var makeup = 0.0
+    var noiseReduction = true
     var compression = true
     var bypass = false
     var muted = false
@@ -26,7 +27,7 @@ struct VoiceSettings: Codable, Equatable {
         CMControls(inputGainDB: Float(inputGain), highPassHz: Float(highPass), mudGainDB: Float(mud),
                    presenceGainDB: Float(presence), thresholdDB: Float(threshold), ratio: Float(ratio),
                    makeupDB: Float(makeup), bypass: bypass ? 1 : 0, muted: muted ? 1 : 0,
-                   compressionEnabled: compression ? 1 : 0, monitorGainDB: Float(monitorGain))
+                   compressionEnabled: compression ? 1 : 0, monitorGainDB: Float(monitorGain), noiseReductionEnabled: noiseReduction ? 1 : 0)
     }
 
     static func load(_ data: Data?) -> VoiceSettings {
@@ -230,6 +231,7 @@ final class Session: ObservableObject {
     func applyFlat() {
         var preset = settings
         preset.inputGain = 0; preset.highPass = 0; preset.mud = 0; preset.presence = 0
+        preset.noiseReduction = false
         preset.compression = false; preset.makeup = 0; preset.bypass = false
         settings = preset
     }

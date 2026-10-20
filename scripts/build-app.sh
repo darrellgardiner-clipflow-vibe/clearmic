@@ -7,6 +7,7 @@ app="$PWD/build/ClearMic.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$app/Contents/Frameworks"
 cp "$bin_dir/ClearMic" "$app/Contents/MacOS/ClearMic"
 cp LICENSE "$app/Contents/Resources/LICENSE"
+cp vendor/RNNoise/NOTICE.txt "$app/Contents/Resources/RNNoise-LICENSE"
 ditto .build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework "$app/Contents/Frameworks/Sparkle.framework"
 scripts/build-driver.sh
 python3 scripts/package-component.py driver

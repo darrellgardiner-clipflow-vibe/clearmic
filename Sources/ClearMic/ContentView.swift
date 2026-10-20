@@ -74,6 +74,15 @@ struct ContentView: View {
                         key("listen", "headphones", on: session.settings.monitoring, color: Panel.orange) { session.settings.monitoring.toggle() }
                             .disabled(session.selectedMonitor == nil)
                     }
+                    HStack {
+                        VStack(alignment: .leading, spacing: 5) {
+                            caption("SPEECH NOISE REDUCTION")
+                            Text("Reduce background noise before output gain")
+                                .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 8)
+                        Toggle("Speech noise reduction", isOn: $session.settings.noiseReduction).toggleStyle(HardwareToggle())
+                    }
                     display(narrow: narrow)
                     (stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 24)) : AnyLayout(HStackLayout(alignment: .top, spacing: 16))) {
                         VStack(alignment: .leading, spacing: 12) {

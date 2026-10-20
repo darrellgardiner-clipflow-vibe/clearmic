@@ -1,4 +1,5 @@
 #include "ClearMicAudio.h"
+#include "rnnoise.h"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -64,6 +65,23 @@ struct CMProcessor {
     uint32_t inputChannel = 0, outputOffset = 0;
     uint32_t monitorOffset = UINT32_MAX, monitorChannels = 0;
     Biquad highPass, mud, presence;
+    DenoiseState *denoiser = nullptr;
+    std::array<float, 480> noiseInput{}, noiseOutput{};
+    uint32_t noisePosition = 0;
+    float noiseMix = 0;
+
+    ~CMProcessor() { if (denoiser) rnnoise_destroy(denoiser); }
+
+    float cleanSpeech(float sample) {
+        // The library accepts 48 kHz mono frames in 16-bit PCM amplitude units.
+        const float cleaned = noiseOutput[noisePosition] / 32768.0f;
+        noiseInput[noisePosition] = std::clamp(sample, -8.0f, 8.0f) * 32768.0f;
+        if (++noisePosition == noiseInput.size()) {
+            noisePosition = 0;
+            rnnoise_process_frame(denoiser, noiseOutput.data(), noiseInput.data());
+        }
+        return std::isfinite(cleaned) ? cleaned : 0;
+    }
     float inputGain = 1, makeup = 1, reduction = 0, limiter = 1;
     float bypassMix = 0, muteGain = 1, bypassStep = 0, muteStep = 0;
     uint32_t bypassRemaining = 0, muteRemaining = 0;
@@ -91,6 +109,7 @@ struct CMProcessor {
         next.makeupDB = parameters[6].load();
         next.monitorGainDB = parameters[7].load();
         const uint32_t bits = flags.load();
+        next.noiseReductionEnabled = (bits >> 3) & 1;
         next.bypass = bits & 1; next.muted = (bits >> 1) & 1; next.compressionEnabled = (bits >> 2) & 1;
         // No retry loop on the audio thread. Keep the previous snapshot if a UI write overlaps.
         // Sequentially consistent atomic fields keep the whole read between
@@ -125,7 +144,14 @@ struct CMProcessor {
             peakIn = std::max(peakIn, std::abs(raw));
             inputGain = gainSmoothing * inputGain + (1 - gainSmoothing) * targetInput;
             makeup = gainSmoothing * makeup + (1 - gainSmoothing) * targetMakeup;
-            float value = presence.process(mud.process(highPass.process(raw * inputGain)));
+            float value = raw * inputGain;
+            const bool cleaning = controls.noiseReductionEnabled && denoiser;
+            // Keep the model warm while processing so A/B changes do not reset its history.
+            const float cleaned = denoiser ? cleanSpeech(value) : value;
+            const float mixTarget = cleaning ? 1.0f : 0.0f;
+            noiseMix += std::clamp(mixTarget - noiseMix, -1.0f / 2400, 1.0f / 2400);
+            value = value * (1 - noiseMix) + cleaned * noiseMix;
+            value = presence.process(mud.process(highPass.process(value)));
             const float over = std::max(0.0f, decibels(std::abs(value)) - controls.thresholdDB);
             const float targetReduction = controls.compressionEnabled ? over * (1 - 1 / controls.ratio) : 0;
             const float smoothing = targetReduction > reduction ? attack : release;
@@ -154,11 +180,15 @@ struct CMProcessor {
     }
 };
 
-CMControls CMDefaultControls(void) { return {0, 80, -3, 2, -18, 3, 0, 0, 0, 1, -18}; }
+CMControls CMDefaultControls(void) { return {0, 80, -3, 2, -18, 3, 0, 0, 0, 1, -18, 0}; }
 
 CMProcessor *CMProcessorCreate(double rate) {
     if (!std::isfinite(rate) || rate < 8000 || rate > 192000) return nullptr;
     auto *p = new (std::nothrow) CMProcessor(rate);
+    if (p && rate == 48000) {
+        p->denoiser = rnnoise_create(nullptr);
+        if (!p->denoiser) { delete p; return nullptr; }
+    }
     if (p) CMProcessorSetControls(p, CMDefaultControls());
     return p;
 }
@@ -174,7 +204,7 @@ void CMProcessorSetControls(CMProcessor *p, CMControls c) {
     };
     p->sequence.fetch_add(1);
     for (size_t i = 0; i < values.size(); ++i) p->parameters[i].store(values[i]);
-    p->flags.store((!!c.bypass) | ((!!c.muted) << 1) | ((!!c.compressionEnabled) << 2));
+    p->flags.store((!!c.bypass) | ((!!c.muted) << 1) | ((!!c.compressionEnabled) << 2) | ((!!c.noiseReductionEnabled) << 3));
     p->sequence.fetch_add(1);
 }
 

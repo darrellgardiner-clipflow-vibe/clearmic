@@ -11,7 +11,7 @@ Hardware/browser validation and long-session testing are still required.
 ## What it does
 
 - Select one hardware input channel and send it equally to both virtual channels.
-- Apply input trim, a high-pass filter, low-mid EQ, presence EQ, compression,
+- Apply input trim, offline speech noise reduction, a high-pass filter, low-mid EQ, presence EQ, compression,
   output gain, and a −1 dBFS limiter.
 - Compare with the raw signal using Bypass, or silence the output using Mute.
 - Show live input/output peaks, compressor gain reduction and an EQ display.
@@ -137,3 +137,18 @@ Sparkle provides **Check for Updates** in the app menu and automatic update
 checks. Signed app updates preserve preferences and the installed driver.
 Driver changes are a separate administrator step. See [update maintenance](docs/updates.md)
 for signing, feed publication and the remaining installed-update test.
+
+## Speech noise reduction
+
+Enable Speech Noise Reduction to reduce background noise while adding gain.
+It uses a bundled RNNoise model locally, with no account, network access or
+usage fees. Input trim feeds the denoiser; EQ, compression and output gain
+follow it. Natural enables cleanup, and Flat disables it for comparison.
+Bypass remains dry, and Mute silences both outputs.
+
+Noise reduction adds frame buffering and model lookahead. Bluetooth monitoring
+adds its own delay. Compare on/off with your own voice: cleanup can alter
+consonants and voice texture and cannot remove all room echo or background speech.
+The bundled model runs while processing to keep comparisons responsive. Stop
+processing to release the audio route and denoiser. Third-party notices are
+in vendor/RNNoise and the application resources.

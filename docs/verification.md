@@ -117,3 +117,26 @@ colours and black button wells. Highlight opacity is reduced throughout the
 buttons, selector edges and dial collars. Light-mode palette values remain
 unchanged. Native light/dark renders at 320 through 1080 points are generated
 by `scripts/render-ui.sh`; this revision changes appearance only.
+
+## Speech cleanup, 0.1.6
+
+Nineteen offline tests pass, including steady seeded noise suppression of
+more than 8 dB after warmup, synthetic speech retention alongside noise,
+callback-size independence, dry bypass/mute precedence and invalid/silent
+sample handling. The speech fixture is generated locally, not a user recording.
+These checks do not establish perceptual quality for the user's voice.
+
+`scripts/check-noise-budget.sh` times the real release processor for five
+1,000-block runs after a 100-block warmup, consuming non-silent PCM and checking
+processed frame counts, nonzero output energy, bounds and finite samples.
+On this 8-core Mac with load average 9.13, median block time was 0.252–0.253 ms,
+p99 0.334–0.356 ms and maximum 0.361–0.422 ms for 480-frame/10-ms blocks.
+This is a CPU/DSP microcheck with the normal SIMD model path; it excludes
+Core Audio scheduling, device clocks and Bluetooth transport and does not
+guarantee live drop-out-free playback.
+
+Live check: update, choose PodMic USB/Input 1 and the actual headphone output,
+start, enable Speech Noise Reduction, then compare on/off at unchanged trim
+and output settings. Speak normally, pause, and test consonants and breaths.
+Check both headphone playback and Riverside recording before accepting the
+voice quality and latency. A virtual driver reinstall is not required.
