@@ -95,3 +95,17 @@ The read-only device probe reports the connected AirPods Pro microphone at
 input. Source switching fixes do not establish Bluetooth microphone support;
 unsupported sample rates are labelled and refused explicitly. No driver was
 installed and Core Audio was not restarted during these checks.
+
+## Hardware selectors and display, 0.1.4
+
+Source, channel and headphone selectors use recessed custom menu labels with
+standard selection menus. The compressor uses a custom toggle with a native
+accessibility representation. Active buttons use the EQ orange and retain the
+same 85 by 68 point cap dimensions as inactive buttons. Only an actual press
+moves the cap. The display uses static scanlines, gradients and a vignette,
+with no timer or animated shader; no frame-rate performance claim is made.
+
+Fourteen tests pass, including four source-switch lifecycle cases. Offscreen
+rendering covers light/dark appearance at 320 through 1080 points. Opening
+menus, VoiceOver, physical presses and actual microphone switching in the
+installed app still require a live user check.

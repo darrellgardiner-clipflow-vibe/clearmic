@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-private enum Panel {
+enum Panel {
     static func adaptive(_ light: NSColor, _ dark: NSColor) -> Color {
         Color(nsColor: NSColor(name: nil) { appearance in
             appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
@@ -32,7 +32,7 @@ struct ContentView: View {
                         }
                         if !narrow { Spacer() }
                         HStack(spacing: 12) {
-                        key("bypass", "arrow.triangle.branch", on: session.settings.bypass, color: Panel.blue) { session.settings.bypass.toggle() }
+                        key("bypass", "arrow.triangle.branch", on: session.settings.bypass, color: Panel.orange) { session.settings.bypass.toggle() }
                         key("mute", "mic.slash", on: session.settings.muted, color: Panel.orange) { session.settings.muted.toggle() }
                         key(session.running ? "stop" : "start", session.running ? "stop.fill" : "play.fill", on: session.running, color: Panel.orange) {
                             if session.running { session.stop() } else { Task { await session.start() } }
@@ -42,7 +42,7 @@ struct ContentView: View {
                     (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 22)) : AnyLayout(HStackLayout(spacing: 22))) {
                         VStack(alignment: .leading, spacing: 8) {
                             caption("01 / SOURCE")
-                            Picker("Microphone", selection: Binding(get: { session.settings.sourceUID }, set: session.selectSource)) {
+                            HardwareSelector("Microphone", value: session.selectedDevice?.name ?? (session.settings.sourceUID.isEmpty ? "Select microphone" : "Input disconnected"), selection: Binding(get: { session.settings.sourceUID }, set: session.selectSource)) {
                                 Text("Select microphone").tag("")
                                 if !session.settings.sourceUID.isEmpty && session.selectedDevice == nil {
                                     Text("Saved input disconnected").tag(session.settings.sourceUID)
@@ -50,25 +50,25 @@ struct ContentView: View {
                                 ForEach(session.devices) { device in
                                     Text(device.sampleRate == 48000 ? device.name : "\(device.name) (\(Int(device.sampleRate / 1000)) kHz, unsupported)").tag(device.uid)
                                 }
-                            }.labelsHidden().frame(maxWidth: narrow ? .infinity : 240)
-                            Picker("Channel", selection: $session.settings.channel) {
+                            }.frame(maxWidth: narrow ? .infinity : 260)
+                            HardwareSelector("Channel", value: "Input \(session.settings.channel + 1)", selection: $session.settings.channel) {
                                 ForEach(0..<max(1, session.selectedDevice?.inputChannels ?? 1), id: \.self) { Text("Input \($0 + 1)").tag($0) }
                             }.frame(maxWidth: 160)
                         }
                         if !narrow { Divider().frame(height: 65) }
                         VStack(alignment: .leading, spacing: 8) {
                             caption("02 / HEADPHONE OUTPUT")
-                            Picker("Headphone output", selection: $session.settings.monitorUID) {
+                            HardwareSelector("Headphone output", value: session.selectedMonitor?.name ?? (session.settings.monitorUID.isEmpty ? "Select headphone output" : "Output disconnected"), selection: $session.settings.monitorUID) {
                                 Text("Select headphone output").tag("")
                                 if !session.settings.monitorUID.isEmpty && session.selectedMonitor == nil {
                                     Text("Saved output disconnected").tag(session.settings.monitorUID)
                                 }
                                 ForEach(session.outputs) { Text($0.name).tag($0.uid) }
-                            }.labelsHidden().frame(maxWidth: narrow ? .infinity : 240)
+                            }.frame(maxWidth: narrow ? .infinity : 260)
                             Text("Processed voice · use headphones").font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
                         }
                         if !narrow { Spacer() }
-                        key("listen", "headphones", on: session.settings.monitoring, color: Panel.blue) { session.settings.monitoring.toggle() }
+                        key("listen", "headphones", on: session.settings.monitoring, color: Panel.orange) { session.settings.monitoring.toggle() }
                             .disabled(session.selectedMonitor == nil)
                     }
                     display(narrow: narrow)
@@ -78,7 +78,7 @@ struct ContentView: View {
                             LazyVGrid(columns: [GridItem(.adaptive(minimum: 99), spacing: 4)], spacing: 18) {
                                 dial("trim", "INPUT", $session.settings.inputGain, -12...18, "dB", Panel.ink)
                                 dial("rumble", "HIGH-PASS", $session.settings.highPass, 0...180, "Hz", Panel.ink)
-                                dial("body", "280 Hz", $session.settings.mud, -12...6, "dB", Panel.blue)
+                                dial("body", "280 Hz", $session.settings.mud, -12...6, "dB", Panel.orange)
                                 dial("clarity", "3.5 kHz", $session.settings.presence, -6...9, "dB", Panel.orange)
                             }
                         }
@@ -87,7 +87,7 @@ struct ContentView: View {
                             HStack {
                                 caption("04 / DYNAMICS")
                                 Spacer()
-                                Toggle("on", isOn: $session.settings.compression).font(.caption).toggleStyle(.checkbox)
+                                Toggle("Compressor", isOn: $session.settings.compression).toggleStyle(HardwareToggle())
                             }
                             LazyVGrid(columns: [GridItem(.adaptive(minimum: 99), spacing: 4)], spacing: 18) {
                                 dial("threshold", "COMPRESSOR", $session.settings.threshold, -40...0, "dB", Panel.ink)
@@ -103,15 +103,15 @@ struct ContentView: View {
                         }
                         if !narrow { Spacer(minLength: 0) }
                         HStack {
-                        Image(systemName: "headphones").foregroundStyle(Panel.blue)
+                        Image(systemName: "headphones").foregroundStyle(Panel.orange)
                         Text("listen level").font(.system(size: 11, design: .monospaced))
-                        Slider(value: $session.settings.monitorGain, in: -48...0).frame(minWidth: 50, maxWidth: 135).tint(Panel.blue)
+                        Slider(value: $session.settings.monitorGain, in: -48...0).frame(minWidth: 50, maxWidth: 135).tint(Panel.orange)
                         Text(String(format: "%.0f dB", session.settings.monitorGain)).font(.system(size: 11, design: .monospaced)).frame(width: 45)
                         }
                     }
                     (narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 14)) : AnyLayout(HStackLayout(spacing: 10))) {
                         HStack(spacing: 10) {
-                        Circle().fill(session.running ? Panel.blue : Panel.ink.opacity(0.25)).frame(width: 7, height: 7)
+                        Circle().fill(session.running ? Panel.orange : Panel.ink.opacity(0.25)).frame(width: 7, height: 7)
                         Text(session.message).font(.system(size: 11, design: .monospaced)).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
                         }
                         if !narrow { Spacer(minLength: 0) }
@@ -157,17 +157,29 @@ struct ContentView: View {
                     .font(.system(size: 10, design: .monospaced)).foregroundStyle(session.settings.muted ? Panel.orange : Panel.lcd.opacity(0.6))
             }.frame(maxWidth: narrow ? .infinity : 280)
         }.padding(23).foregroundStyle(Panel.lcd)
-            .background(RoundedRectangle(cornerRadius: 9).fill(Color(red: 0.075, green: 0.085, blue: 0.08).shadow(.inner(color: .black.opacity(0.85), radius: 7, x: 3, y: 5)))
-                .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(.black.opacity(0.75), lineWidth: 3))
-                .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(LinearGradient(colors: [.black.opacity(0.9), .white.opacity(0.5)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 2))
-                .shadow(color: Panel.highlight, radius: 1, x: 1, y: 2))
+            .background {
+                RoundedRectangle(cornerRadius: 11)
+                    .fill(Panel.ivory.shadow(.inner(color: .black.opacity(0.4), radius: 4, x: 2, y: 3)))
+                    .padding(-4)
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color(red: 0.055, green: 0.065, blue: 0.06)
+                        .shadow(.inner(color: .black.opacity(0.95), radius: 10, x: 2, y: 4)))
+            }
+            .overlay { LCDGlass().clipShape(RoundedRectangle(cornerRadius: 8)).allowsHitTesting(false).accessibilityHidden(true) }
+
     }
     private func caption(_ text: String) -> some View {
         Text(text).font(.system(size: 10, weight: .medium, design: .monospaced)).tracking(0.6).foregroundStyle(Panel.ink.opacity(0.55))
     }
     private func key(_ text: String, _ symbol: String, on: Bool, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 6) { Image(systemName: symbol).font(.system(size: 17)); Text(text).font(.system(size: 10, design: .monospaced)) }
+            VStack(spacing: 6) {
+                Image(systemName: symbol).font(.system(size: 17))
+                HStack(spacing: 4) {
+                    Circle().fill(on ? Color.white : Panel.ink.opacity(0.3)).frame(width: 4, height: 4)
+                    Text(text).font(.system(size: 10, design: .monospaced))
+                }
+            }
                 .frame(width: 55, height: 44)
         }.buttonStyle(HardwareButton(selected: on, color: color)).accessibilityLabel(text)
     }
@@ -316,5 +328,32 @@ private struct EQDisplay: View {
             result += magnitude(b0, -2*b0, b0, -2*c/a0, (1-alpha)/a0)
         }
         return result
+    }
+}
+
+private struct LCDGlass: View {
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                Canvas { context, size in
+                    var lines = Path()
+                    for row in stride(from: 0.0, to: size.height, by: 3) {
+                        lines.move(to: CGPoint(x: 0, y: row))
+                        lines.addLine(to: CGPoint(x: size.width, y: row))
+                    }
+                    context.stroke(lines, with: .color(.black.opacity(0.11)), lineWidth: 1)
+                }
+                LinearGradient(stops: [
+                    .init(color: .white.opacity(0.035), location: 0),
+                    .init(color: .clear, location: 0.45),
+                    .init(color: .black.opacity(0.06), location: 1)
+                ], startPoint: .topLeading, endPoint: .bottomTrailing)
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(.clear.shadow(.inner(color: .black.opacity(0.8), radius: 13, x: 0, y: 0)))
+                RadialGradient(colors: [.clear, .black.opacity(0.22)], center: .center,
+                               startRadius: min(geometry.size.width, geometry.size.height) * 0.3,
+                               endRadius: max(geometry.size.width, geometry.size.height) * 0.65)
+            }
+        }
     }
 }
