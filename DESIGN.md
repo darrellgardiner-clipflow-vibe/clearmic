@@ -62,16 +62,20 @@ menu interaction, VoiceOver or physical audio capture.
 
 The original orange-red C remains the primary mark on a warm white macOS tile.
 Its broad ribbon has opposing diagonal terminals. A smaller, horizontal
-microphone capsule sits inside the opening, with a rear connector on the left
-and a rounded grille end facing right. The C and capsule use separate geometry,
-with white space between them so the C stays dominant.
+microphone body sits inside the opening, with a softly squared rear and a
+rounded end facing right. It has no connector or stand. A waveform knockout
+crosses its short axis in place of grille slots, revealing the white tile
+beneath. The C and microphone use separate geometry, with white space between
+them so the C stays dominant. The complete mark is shifted left (20 points on
+the 1024-point canvas) for optical balance; the tile stays in its original position.
 
 Both shapes read as recesses cut into the white surface. Inner shadows cast
 from each inverse silhouette fall into the coloured cavity, and a pale lip
 defines the surface edge. There is no external shadow beneath the coloured
 mark; the tile retains its own soft shadow. Generous white space and a continuous
-tile contour keep the icon readable in the Dock. Capsule grille slots are
-omitted below 64 pixels.
+tile contour keep the icon readable in the Dock. The waveform remains at every
+size, with a heavier stroke at 16 and 32 pixels (20 canvas points versus 14 at
+larger sizes).
 This asset does not change the controls' existing colours or materials.
 
 `scripts/build-icon.swift` owns the original paths and renders every iconset

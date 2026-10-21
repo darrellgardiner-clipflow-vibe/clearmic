@@ -50,21 +50,33 @@ func ribbonPath() -> NSBezierPath {
 }
 
 func capsulePath() -> NSBezierPath {
-    // A small rear connector and rounded grille end establish a right-facing mic.
-    // The C remains much heavier and stays separate from this secondary detail.
+    // Body only: a softly squared rear and a rounded right-facing nose.
     let p = NSBezierPath()
-    p.move(to: NSPoint(x: 478, y: 526))
-    p.line(to: NSPoint(x: 506, y: 526))
-    p.curve(to: NSPoint(x: 568, y: 570), controlPoint1: NSPoint(x: 520, y: 556), controlPoint2: NSPoint(x: 538, y: 570))
+    p.move(to: NSPoint(x: 526, y: 570))
     p.line(to: NSPoint(x: 692, y: 570))
     p.curve(to: NSPoint(x: 750, y: 512), controlPoint1: NSPoint(x: 728, y: 570), controlPoint2: NSPoint(x: 750, y: 548))
     p.curve(to: NSPoint(x: 692, y: 454), controlPoint1: NSPoint(x: 750, y: 476), controlPoint2: NSPoint(x: 728, y: 454))
-    p.line(to: NSPoint(x: 568, y: 454))
-    p.curve(to: NSPoint(x: 506, y: 498), controlPoint1: NSPoint(x: 538, y: 454), controlPoint2: NSPoint(x: 520, y: 468))
-    p.line(to: NSPoint(x: 478, y: 498))
-    p.curve(to: NSPoint(x: 464, y: 512), controlPoint1: NSPoint(x: 469, y: 498), controlPoint2: NSPoint(x: 464, y: 503))
-    p.curve(to: NSPoint(x: 478, y: 526), controlPoint1: NSPoint(x: 464, y: 521), controlPoint2: NSPoint(x: 469, y: 526))
+    p.line(to: NSPoint(x: 526, y: 454))
+    p.curve(to: NSPoint(x: 510, y: 470), controlPoint1: NSPoint(x: 515, y: 454), controlPoint2: NSPoint(x: 510, y: 459))
+    p.line(to: NSPoint(x: 510, y: 554))
+    p.curve(to: NSPoint(x: 526, y: 570), controlPoint1: NSPoint(x: 510, y: 565), controlPoint2: NSPoint(x: 515, y: 570))
     p.close()
+    return p
+}
+
+func waveformPath(pixels: Int) -> NSBezierPath {
+    // The waveform turns with the sideways mic and cuts across its short axis.
+    let p = NSBezierPath()
+    p.move(to: NSPoint(x: 634, y: 590))
+    p.line(to: NSPoint(x: 634, y: 550))
+    p.line(to: NSPoint(x: 658, y: 538))
+    p.line(to: NSPoint(x: 610, y: 518))
+    p.line(to: NSPoint(x: 658, y: 496))
+    p.line(to: NSPoint(x: 634, y: 480))
+    p.line(to: NSPoint(x: 634, y: 434))
+    p.lineWidth = pixels <= 32 ? 20 : 14
+    p.lineJoinStyle = .round
+    p.lineCapStyle = .round
     return p
 }
 
@@ -118,17 +130,20 @@ func drawIcon(pixels: Int) {
     tile.stroke()
     NSGraphicsContext.restoreGraphicsState()
 
+    NSGraphicsContext.saveGraphicsState()
+    // Optical centering applies to the complete mark, not the white tile.
+    let balance = NSAffineTransform()
+    balance.translateX(by: -20, yBy: 0)
+    balance.concat()
     recess(ribbonPath(), pixels: pixels)
+    let context = NSGraphicsContext.current!.cgContext
+    context.beginTransparencyLayer(auxiliaryInfo: nil)
     recess(capsulePath(), pixels: pixels)
-
-    // Grille slots are secondary details. Omit below 64px to preserve the C.
-    if pixels >= 64 {
-        for (x, height) in [(682.0, 72.0), (702.0, 64.0), (722.0, 42.0)] {
-            let slot = NSBezierPath(roundedRect: NSRect(x: x, y: 512 - height / 2, width: 6, height: height), xRadius: 3, yRadius: 3)
-            color(1, 0.96, 0.92, 0.90).setFill()
-            slot.fill()
-        }
-    }
+    context.setBlendMode(.clear)
+    waveformPath(pixels: pixels).stroke()
+    context.setBlendMode(.normal)
+    context.endTransparencyLayer()
+    NSGraphicsContext.restoreGraphicsState()
 }
 
 for size in [16, 32, 128, 256, 512] {
