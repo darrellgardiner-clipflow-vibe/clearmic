@@ -60,14 +60,18 @@ menu interaction, VoiceOver or physical audio capture.
 
 ## App icon
 
-The icon is an original orange-red microphone on a warm white macOS tile.
-Its capsule, cradle, stem and foot form one continuous outline, with the stand
-integrated into the silhouette. The whole mark tilts clockwise (12 degrees).
-A waveform cuts through the microphone body, exposing the tile beneath it;
-the knockout is isolated to the mark so it never exposes the desktop.
-Generous white space, a continuous tile contour and restrained edge relief
-keep it readable in the Dock. The waveform cut thickens at 32 pixels and below,
-and the inset rim is omitted below 64 pixels.
+The original orange-red C remains the primary mark on a warm white macOS tile.
+Its broad ribbon has opposing diagonal terminals. A smaller, horizontal
+microphone capsule sits inside the opening, with a rear connector on the left
+and a rounded grille end facing right. The C and capsule use separate geometry,
+with white space between them so the C stays dominant.
+
+Both shapes read as recesses cut into the white surface. Inner shadows cast
+from each inverse silhouette fall into the coloured cavity, and a pale lip
+defines the surface edge. There is no external shadow beneath the coloured
+mark; the tile retains its own soft shadow. Generous white space and a continuous
+tile contour keep the icon readable in the Dock. Capsule grille slots are
+omitted below 64 pixels.
 This asset does not change the controls' existing colours or materials.
 
 `scripts/build-icon.swift` owns the original paths and renders every iconset
