@@ -1,0 +1,23 @@
+name: Bug report
+description: Report an installation, audio or interface problem
+title: "[Bug]: "
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: Setup
+      description: ClearMic version, macOS version, Mac chip, microphone/interface, sample rate and receiving app. No private device IDs.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps, expected result and actual result
+      description: Include any visible error. Do not attach private recordings or credentials.
+    validations:
+      required: true
+  - type: textarea
+    id: installation
+    attributes:
+      label: Installation and recovery
+      description: Downloaded installer or source build? Does reopening the app or reconnecting the microphone help?

@@ -42,7 +42,9 @@ Connect app. This repository does not publish iOS releases or submit apps automa
 3. Select the Bluetooth input. Wait for Input ready and the matching verified name.
 4. Tap Test microphone and speak. The meter must react to the Bluetooth microphone,
    not just the phone. Stop/reconnect on any mismatch or lost source.
-5. Tap Prepare Camera. The microphone test stops, leaving the audio session prepared.
+5. Tap Prepare Camera. ClearMic starts a fresh temporary capture, keeping the selected
+   mic active in the background for up to five minutes. Confirm the microphone-use
+   indicator remains visible when switching to the Home Screen or a non-audio app.
 6. Switch to Apple's Camera app yourself and record a short video. Put the iPhone
    farther away and speak close to the Bluetooth mic. Also test touching the phone
    near its built-in microphones to distinguish which input was actually recorded.
@@ -59,13 +61,16 @@ what Camera recorded. A real device test is required before claiming success.
 
 Microphone access is requested only on Connect/Find/selection. The level test
 writes at most 30 seconds of mono PCM into the app's temporary directory for
-AVAudioRecorder metering. Stop, handoff, test completion, source loss and errors
-stop the recorder and delete that file. The next app launch also removes a file
+AVAudioRecorder metering. Prepare Camera starts a new capture of up to five
+minutes and enables background audio while you switch apps. Stop, interruption,
+capture completion, source loss and errors stop the recorder and delete that file. The next app launch also removes a file
 left by a crash. No recordings are exported or uploaded.
 
 There is no playback/monitoring output, Core Bluetooth scan, camera capture,
-photo-library access or background-audio entitlement. Preparing Camera does not
-continue the level test or run a background loop that fights for microphone access.
+photo-library access. `UIBackgroundModes` includes `audio` for the user-started
+capture. Preparing Camera starts capture while the app is foregrounded. If iOS
+interrupts it, ClearMic reports that capture ended and never automatically
+reactivates the recorder or competes with Camera for the microphone.
 
 ## Architecture and checks
 
@@ -89,18 +94,30 @@ simulator using installed SDKs, then checks Mach-O platform/version metadata.
 It does not sign, install, boot a simulator, download a runtime or access microphones.
 Artifacts live in ignored `build/ios-sdk/{iphoneos,iphonesimulator}/ClearMic.app`.
 
-Nine host-run tests cover discovery without automatic selection/capture, permission
+Host-run tests cover discovery without automatic selection/capture, permission
 denial and stale permission races, actual-input checks, selected-source loss and
 explicit reconnect, bounded meters/test duration, recording failure, interruptions,
-media reset, gain bounds and Camera handoff without automatically reclaiming input.
-Both SDK targets compile without diagnostics. On the Mac mini, the nine route
+media reset, gain bounds, background-handoff capture, its five-minute native
+recorder deadline, explicit Stop, missing completion callbacks, and interruptions
+without automatically reclaiming input.
+Earlier prototype verification: both SDK targets compiled without diagnostics.
+On the Mac mini, the original nine route
 tests, normal Xcode simulator build and unsigned Release device archive pass
 with Xcode 26.6 and the installed iOS 26.5 platform. UI execution, system
 permission prompts, real Bluetooth levels, temporary-file cleanup on-device and
 Camera route retention remain unverified. The macOS app and updater are not
 changed by this prototype.
 
+The background-capture revision passes 14 RouteCore tests, six release-tool
+checks, and both unsigned SDK builds. The original handoff test failed when
+changed to require continued capture before the fix. Both built Info.plists
+contain the audio background mode. The QA simulator could not be opened because
+the device agent failed to start; the microphone indicator, Bluetooth capture
+while switching, and the actual Camera recording still require an iPhone test.
+
 ## Platform references
+
+- [Apple: background recording and audio-session interruptions](https://developer.apple.com/documentation/avfaudio/avaudiosession/category-swift.struct/record)
 
 - [Apple: selecting a preferred input](https://developer.apple.com/documentation/avfaudio/avaudiosession/setpreferredinput(_:))
 - [Apple: available inputs](https://developer.apple.com/documentation/avfaudio/avaudiosession/availableinputs)
@@ -191,3 +208,13 @@ removed after successful setup. A password-protected identity backup remains in
 the owner-only signing directory. The generated keychain password is stored under
 ClearMic-specific names in the existing owner-only studio device credential file.
 The release export explicitly selects this certificate and profile.
+
+## Portable release configuration
+
+Other maintainers can provide the environment variables named above directly;
+no private studio library is required when all requested variables are present.
+`STUDIO_LIB_PATH` remains an optional fallback for the original maintainer.
+Use your own bundle identifier, App Store Connect app and signing configuration
+in `ios/Release.json`. The signing-setup helper is specific to the original
+maintainer; external contributors should configure signing in Xcode.
+The experimental iPhone workflow is separate from the macOS public beta.

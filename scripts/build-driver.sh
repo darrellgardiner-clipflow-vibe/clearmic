@@ -7,7 +7,15 @@ xcrun clang -arch arm64 -arch x86_64 -mmacosx-version-min=14.0 -O2 -Wno-format-e
   -include "$PWD/Driver/ClearMicConfig.h" vendor/BlackHole/BlackHole.c \
   -framework CoreAudio -framework CoreFoundation -framework Accelerate \
   -o "$bundle/Contents/MacOS/ClearMic"
-cp vendor/BlackHole/BlackHole.icns "$bundle/Contents/Resources/"
+swift scripts/build-icon.swift build/ClearMic.iconset
+iconutil -c icns build/ClearMic.iconset -o build/ClearMic.icns
+cp build/ClearMic.icns "$bundle/Contents/Resources/"
+# Remove the old branded resource from incremental build output only.
+python3 - "$bundle" <<'CLEAN'
+import pathlib, sys
+(pathlib.Path(sys.argv[1]) / 'Contents/Resources/BlackHole.icns').unlink(missing_ok=True)
+CLEAN
+cp LICENSE "$bundle/Contents/Resources/LICENSE"
 python3 - "$bundle" <<'PY'
 import pathlib, plistlib, sys
 bundle = pathlib.Path(sys.argv[1])
@@ -23,6 +31,5 @@ info = {
 with (bundle / 'Contents/Info.plist').open('wb') as f:
     plistlib.dump(info, f)
 PY
-codesign --force --sign "${CLEARMIC_SIGN_IDENTITY:--}" "$bundle"
-codesign --verify --strict "$bundle"
+python3 scripts/sign-bundle.py "$bundle"
 echo "Built $bundle"

@@ -57,3 +57,43 @@ confirmation and all setup pages. It uses isolated preferences and no real audio
 Run `scripts/check.sh` for preset persistence, permission/lifecycle behavior,
 studio bypass and channel routing. Static renders do not prove keyboard focus,
 menu interaction, VoiceOver or physical audio capture.
+
+## App icon
+
+The original orange-red C remains the primary mark on a warm white macOS tile.
+Its broad ribbon has opposing diagonal terminals. A smaller, horizontal
+microphone body sits inside the opening, with a curved rear nested into the C’s internal
+curve and a rounded end facing right. A consistent 28–30 point white channel
+separates the rear from the C on the 1024-point canvas. It has no connector or stand. A diagonal waveform knockout
+crosses the lower C and the centre of the microphone body, revealing the white
+tile beneath. Its axis is exactly parallel to the C terminal (118:116), and its
+peaks use coordinates along and perpendicular to that axis. Both straight tails
+are collinear. The uniform 34-point channel is slightly heavier than the 28–30 point gap
+around the microphone. The cutout’s exposed corners have a 7-point radius,
+so the waveform meets the outer edges with soft junctions. It exits through the C's opening without slicing off a thin
+upper fragment. The C and microphone use separate geometry, with white space between
+them so the C stays dominant. The complete mark is shifted left (20 points on
+the 1024-point canvas) for optical balance; the tile stays in its original position.
+
+The C and mic are united and the stroked waveform is subtracted before shading.
+The resulting compound shape reads as one recess cut into the white surface.
+An inner shadow from its inverse silhouette falls into every coloured cavity,
+including the waveform edges, and a pale lip
+defines the surface edge. There is no external shadow beneath the coloured
+mark; the tile retains its own soft shadow. Generous white space and a continuous
+tile contour keep the icon readable in the Dock. The waveform uses the same proportional width at every size.
+This asset does not change the controls' existing colours or materials.
+
+`scripts/build-icon.swift` owns the original paths and renders every iconset
+representation directly at its target resolution, from 16 through 1024 pixels.
+The app and HAL driver share the resulting `ClearMic.icns`; no Apple or
+BlackHole artwork is shipped. `scripts/build-driver.sh` generates and packages
+the icon, and `scripts/build-app.sh` copies that same asset into the app.
+Verify with `scripts/check.sh`, then inspect the generated iconset at small and
+large sizes and confirm both bundles contain the same icon. Build success alone
+does not prove how an installed icon appears in Finder or the Dock.
+
+For the iOS asset catalog, run `swift scripts/build-icon.swift
+ios/App/Assets.xcassets/AppIcon.appiconset --ios`. This uses the same approved
+mark and recessed treatment, filling an opaque 1024-pixel white canvas. iOS
+supplies the corner mask; the macOS tile and transparent margin are omitted.

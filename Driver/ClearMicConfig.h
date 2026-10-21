@@ -1,7 +1,7 @@
 // BlackHole customization. Source remains unchanged in vendor/BlackHole.
 #define kDriver_Name "ClearMic"
 #define kPlugIn_BundleID "org.clearmic.audio.driver"
-#define kPlugIn_Icon "BlackHole.icns"
+#define kPlugIn_Icon "ClearMic.icns"
 #define kHas_Driver_Name_Format false
 #define kDevice_Name "ClearMic"
 #define kDevice2_Name "ClearMic Send"

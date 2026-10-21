@@ -13,7 +13,8 @@
 <key>ITSAppUsesNonExemptEncryption</key><false/>
 <key>UISupportedInterfaceOrientations~ipad</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
 <key>LSRequiresIPhoneOS</key><true/>
-<key>NSMicrophoneUsageDescription</key><string>ClearMic tests the microphone you select and prepares its audio route before you try Camera. Temporary level-test recordings are deleted when the test ends.</string>
+<key>NSMicrophoneUsageDescription</key><string>ClearMic tests the microphone you select and prepares its audio route before you try Camera. Prepare Camera keeps the selected microphone recording temporarily in the background for up to 5 minutes. Temporary audio is deleted when capture ends.</string>
+<key>UIBackgroundModes</key><array><string>audio</string></array>
 <key>UILaunchScreen</key><dict/>
 <key>UIApplicationSceneManifest</key><dict><key>UIApplicationSupportsMultipleScenes</key><false/></dict>
 <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>

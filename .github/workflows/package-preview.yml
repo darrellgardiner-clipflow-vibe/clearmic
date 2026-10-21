@@ -1,0 +1,23 @@
+name: Package preview
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/check.sh
+      - run: scripts/package.sh
+        env:
+          CLEARMIC_UNIVERSAL: '1'
+      - run: |
+          lipo build/ClearMic.app/Contents/MacOS/ClearMic -verify_arch arm64 x86_64
+          lipo build/ClearMic.driver/Contents/MacOS/ClearMic -verify_arch arm64 x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ClearMic-unsigned-preview
+          path: build/ClearMic-*.pkg
+          if-no-files-found: error
+          retention-days: 14

@@ -10,6 +10,12 @@ is installed separately and remains in place. App updates therefore do not
 require repeating driver installation. If a future release changes the driver,
 that component will require a separate administrator-approved update/reload.
 
+## Public releases
+
+Use [release preparation](releasing.md) for signed, notarized public binaries.
+The legacy `prepare-update.sh` command below prepares development previews only;
+it does not notarize and changes the repository appcast locally.
+
 ## Maintainer workflow
 
 The first signing key was generated locally with CryptoKit. Its private seed is
