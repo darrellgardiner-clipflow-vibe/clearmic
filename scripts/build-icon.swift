@@ -3,6 +3,7 @@ import AppKit
 // Original ClearMic recessed C and right-facing microphone capsule. All geometry lives in a 1024-point canvas.
 // White space, a continuous tile contour and shallow edge relief keep the mark
 // legible in the Dock. Generate each representation directly from the paths.
+let isIOS = CommandLine.arguments.contains("--ios")
 let directory = URL(fileURLWithPath: CommandLine.arguments[1])
 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
@@ -137,13 +138,13 @@ func recess(_ path: NSBezierPath, pixels: Int) {
 
 func drawIcon(pixels: Int) {
     let outputScale = CGFloat(pixels) / 1024
-    let tile = tilePath()
+    let tile = isIOS ? NSBezierPath(rect: NSRect(x: 0, y: 0, width: 1024, height: 1024)) : tilePath()
     NSGraphicsContext.saveGraphicsState()
     let shadow = NSShadow()
     shadow.shadowColor = color(0.16, 0.12, 0.10, 0.16)
     shadow.shadowOffset = NSSize(width: 0, height: -8 * outputScale)
     shadow.shadowBlurRadius = 14 * outputScale
-    shadow.set()
+    if !isIOS { shadow.set() }
     color(0.97, 0.965, 0.955).setFill()
     tile.fill()
     NSGraphicsContext.restoreGraphicsState()
@@ -152,10 +153,19 @@ func drawIcon(pixels: Int) {
     tile.addClip()
     color(1, 1, 1, 0.9).setStroke()
     tile.lineWidth = 5
-    tile.stroke()
+    if !isIOS { tile.stroke() }
     NSGraphicsContext.restoreGraphicsState()
 
     NSGraphicsContext.saveGraphicsState()
+    // iOS supplies the outer icon mask; fill its canvas and retain the same
+    // mark-to-tile proportions as the macOS artwork.
+    if isIOS {
+        let fit = NSAffineTransform()
+        fit.translateX(by: 512, yBy: 512)
+        fit.scale(by: 1024 / 816)
+        fit.translateX(by: -512, yBy: -512)
+        fit.concat()
+    }
     // Optical centering applies to the complete mark, not the white tile.
     let balance = NSAffineTransform()
     balance.translateX(by: -20, yBy: 0)
@@ -165,18 +175,27 @@ func drawIcon(pixels: Int) {
     NSGraphicsContext.restoreGraphicsState()
 }
 
-for size in [16, 32, 128, 256, 512] {
-    for scale in [1, 2] {
-        let pixels = size * scale
-        let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels,
-                                      bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
-                                      isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
-        let transform = NSAffineTransform(); transform.scale(by: CGFloat(pixels) / 1024); transform.concat()
-        drawIcon(pixels: pixels)
-        NSGraphicsContext.restoreGraphicsState()
-        let suffix = scale == 2 ? "@2x" : ""
-        try bitmap.representation(using: .png, properties: [:])!.write(to: directory.appendingPathComponent("icon_\(size)x\(size)\(suffix).png"))
+let representations: [(Int, String)] = isIOS ? [(1024, "AppIcon.png")] :
+    [16, 32, 128, 256, 512].flatMap { size in
+        [(size, "icon_\(size)x\(size).png"), (size * 2, "icon_\(size)x\(size)@2x.png")]
     }
+for (pixels, filename) in representations {
+    let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels,
+                                  bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                                  isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
+    let transform = NSAffineTransform(); transform.scale(by: CGFloat(pixels) / 1024); transform.concat()
+    drawIcon(pixels: pixels)
+    NSGraphicsContext.restoreGraphicsState()
+    let output: NSBitmapImageRep
+    if isIOS {
+        let opaque = CGContext(data: nil, width: pixels, height: pixels,
+                               bitsPerComponent: 8, bytesPerRow: pixels * 4,
+                               space: CGColorSpaceCreateDeviceRGB(),
+                               bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+        opaque.draw(bitmap.cgImage!, in: CGRect(x: 0, y: 0, width: pixels, height: pixels))
+        output = NSBitmapImageRep(cgImage: opaque.makeImage()!)
+    } else { output = bitmap }
+    try output.representation(using: .png, properties: [:])!.write(to: directory.appendingPathComponent(filename))
 }

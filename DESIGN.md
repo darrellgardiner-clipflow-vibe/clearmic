@@ -92,3 +92,8 @@ the icon, and `scripts/build-app.sh` copies that same asset into the app.
 Verify with `scripts/check.sh`, then inspect the generated iconset at small and
 large sizes and confirm both bundles contain the same icon. Build success alone
 does not prove how an installed icon appears in Finder or the Dock.
+
+For the iOS asset catalog, run `swift scripts/build-icon.swift
+ios/App/Assets.xcassets/AppIcon.appiconset --ios`. This uses the same approved
+mark and recessed treatment, filling an opaque 1024-pixel white canvas. iOS
+supplies the corner mask; the macOS tile and transparent margin are omitted.
