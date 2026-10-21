@@ -62,10 +62,12 @@ menu interaction, VoiceOver or physical audio capture.
 
 The original orange-red C remains the primary mark on a warm white macOS tile.
 Its broad ribbon has opposing diagonal terminals. A smaller, horizontal
-microphone body sits inside the opening, with a softly squared rear and a
-rounded end facing right. It has no connector or stand. A waveform knockout
-crosses its short axis in place of grille slots, revealing the white tile
-beneath. The C and microphone use separate geometry, with white space between
+microphone body sits inside the opening, with a curved rear nested into the C’s internal
+curve and a rounded end facing right. A consistent 28–30 point white channel
+separates the rear from the C on the 1024-point canvas. It has no connector or stand. A rising diagonal waveform knockout
+crosses the lower C, microphone body and upper C terminal, revealing the white
+tile beneath. Its shared diagonal and the nested rear give the mark a deliberate
+construction without adding a stand or grille. The C and microphone use separate geometry, with white space between
 them so the C stays dominant. The complete mark is shifted left (20 points on
 the 1024-point canvas) for optical balance; the tile stays in its original position.
 

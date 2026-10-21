@@ -50,30 +50,32 @@ func ribbonPath() -> NSBezierPath {
 }
 
 func capsulePath() -> NSBezierPath {
-    // Body only: a softly squared rear and a rounded right-facing nose.
+    // The rear follows the C's inner curve with a 28–30 point white channel.
+    // A longer horizontal body and compact nose keep the C visually dominant.
     let p = NSBezierPath()
-    p.move(to: NSPoint(x: 526, y: 570))
-    p.line(to: NSPoint(x: 692, y: 570))
-    p.curve(to: NSPoint(x: 750, y: 512), controlPoint1: NSPoint(x: 728, y: 570), controlPoint2: NSPoint(x: 750, y: 548))
-    p.curve(to: NSPoint(x: 692, y: 454), controlPoint1: NSPoint(x: 750, y: 476), controlPoint2: NSPoint(x: 728, y: 454))
-    p.line(to: NSPoint(x: 526, y: 454))
-    p.curve(to: NSPoint(x: 510, y: 470), controlPoint1: NSPoint(x: 515, y: 454), controlPoint2: NSPoint(x: 510, y: 459))
-    p.line(to: NSPoint(x: 510, y: 554))
-    p.curve(to: NSPoint(x: 526, y: 570), controlPoint1: NSPoint(x: 510, y: 565), controlPoint2: NSPoint(x: 515, y: 570))
+    p.move(to: NSPoint(x: 514, y: 584))
+    p.line(to: NSPoint(x: 678, y: 584))
+    p.curve(to: NSPoint(x: 750, y: 512), controlPoint1: NSPoint(x: 718, y: 584), controlPoint2: NSPoint(x: 750, y: 552))
+    p.curve(to: NSPoint(x: 678, y: 440), controlPoint1: NSPoint(x: 750, y: 472), controlPoint2: NSPoint(x: 718, y: 440))
+    p.line(to: NSPoint(x: 514, y: 440))
+    p.curve(to: NSPoint(x: 456, y: 500), controlPoint1: NSPoint(x: 476, y: 440), controlPoint2: NSPoint(x: 456, y: 462))
+    p.line(to: NSPoint(x: 456, y: 524))
+    p.curve(to: NSPoint(x: 514, y: 584), controlPoint1: NSPoint(x: 456, y: 562), controlPoint2: NSPoint(x: 476, y: 584))
     p.close()
     return p
 }
 
 func waveformPath(pixels: Int) -> NSBezierPath {
-    // The waveform turns with the sideways mic and cuts across its short axis.
+    // One rising diagonal passes through the lower C, capsule and upper terminal.
+    // The waveform's peaks follow that shared axis rather than a separate grille.
     let p = NSBezierPath()
-    p.move(to: NSPoint(x: 634, y: 590))
-    p.line(to: NSPoint(x: 634, y: 550))
-    p.line(to: NSPoint(x: 658, y: 538))
-    p.line(to: NSPoint(x: 610, y: 518))
-    p.line(to: NSPoint(x: 658, y: 496))
-    p.line(to: NSPoint(x: 634, y: 480))
-    p.line(to: NSPoint(x: 634, y: 434))
+    p.move(to: NSPoint(x: 330, y: 270))
+    p.line(to: NSPoint(x: 493, y: 505))
+    p.line(to: NSPoint(x: 525, y: 488))
+    p.line(to: NSPoint(x: 518, y: 548))
+    p.line(to: NSPoint(x: 574, y: 524))
+    p.line(to: NSPoint(x: 568, y: 566))
+    p.line(to: NSPoint(x: 740, y: 814))
     p.lineWidth = pixels <= 32 ? 20 : 14
     p.lineJoinStyle = .round
     p.lineCapStyle = .round
@@ -135,9 +137,9 @@ func drawIcon(pixels: Int) {
     let balance = NSAffineTransform()
     balance.translateX(by: -20, yBy: 0)
     balance.concat()
-    recess(ribbonPath(), pixels: pixels)
     let context = NSGraphicsContext.current!.cgContext
     context.beginTransparencyLayer(auxiliaryInfo: nil)
+    recess(ribbonPath(), pixels: pixels)
     recess(capsulePath(), pixels: pixels)
     context.setBlendMode(.clear)
     waveformPath(pixels: pixels).stroke()
