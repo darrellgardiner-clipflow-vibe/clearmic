@@ -66,20 +66,34 @@ func capsulePath() -> NSBezierPath {
 }
 
 func waveformPath(pixels: Int) -> NSBezierPath {
-    // One rising diagonal passes through the lower C, capsule and upper terminal.
-    // The waveform's peaks follow that shared axis rather than a separate grille.
+    // One construction axis, exactly parallel to the C's terminal faces.
+    // Wave peaks are laid out in axis/normal coordinates, not freehand points.
     let p = NSBezierPath()
-    p.move(to: NSPoint(x: 330, y: 270))
-    p.line(to: NSPoint(x: 493, y: 505))
-    p.line(to: NSPoint(x: 525, y: 488))
-    p.line(to: NSPoint(x: 518, y: 548))
-    p.line(to: NSPoint(x: 574, y: 524))
-    p.line(to: NSPoint(x: 568, y: 566))
-    p.line(to: NSPoint(x: 740, y: 814))
-    p.lineWidth = pixels <= 32 ? 20 : 14
+    let terminalLength = hypot(CGFloat(118), CGFloat(116))
+    let axis = CGVector(dx: 118 / terminalLength, dy: 116 / terminalLength)
+    let origin = NSPoint(x: 604, y: 512)
+    let samples: [(CGFloat, CGFloat)] = [
+        (-420, 0), (-60, 0), (-30, 26), (0, -30),
+        (30, 26), (60, 0), (300, 0)
+    ]
+    for (index, sample) in samples.enumerated() {
+        let (along, across) = sample
+        let point = NSPoint(x: origin.x + axis.dx * along - axis.dy * across,
+                            y: origin.y + axis.dy * along + axis.dx * across)
+        if index == 0 { p.move(to: point) } else { p.line(to: point) }
+    }
+    p.lineWidth = 28
     p.lineJoinStyle = .round
     p.lineCapStyle = .round
     return p
+}
+
+func cutoutPath(pixels: Int) -> NSBezierPath {
+    let body = ribbonPath().cgPath.union(capsulePath().cgPath)
+    let waveform = waveformPath(pixels: pixels)
+    let channel = waveform.cgPath.copy(strokingWithWidth: waveform.lineWidth,
+                                      lineCap: .round, lineJoin: .round, miterLimit: 2)
+    return NSBezierPath(cgPath: body.subtracting(channel))
 }
 
 func recess(_ path: NSBezierPath, pixels: Int) {
@@ -137,14 +151,8 @@ func drawIcon(pixels: Int) {
     let balance = NSAffineTransform()
     balance.translateX(by: -20, yBy: 0)
     balance.concat()
-    let context = NSGraphicsContext.current!.cgContext
-    context.beginTransparencyLayer(auxiliaryInfo: nil)
-    recess(ribbonPath(), pixels: pixels)
-    recess(capsulePath(), pixels: pixels)
-    context.setBlendMode(.clear)
-    waveformPath(pixels: pixels).stroke()
-    context.setBlendMode(.normal)
-    context.endTransparencyLayer()
+    // Subtract first, then shade every edge of the resulting cavity together.
+    recess(cutoutPath(pixels: pixels), pixels: pixels)
     NSGraphicsContext.restoreGraphicsState()
 }
 
