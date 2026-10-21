@@ -68,8 +68,9 @@ separates the rear from the C on the 1024-point canvas. It has no connector or s
 crosses the lower C and the centre of the microphone body, revealing the white
 tile beneath. Its axis is exactly parallel to the C terminal (118:116), and its
 peaks use coordinates along and perpendicular to that axis. Both straight tails
-are collinear. The uniform 28-point channel matches the 28–30 point gap around
-the microphone. It exits through the C's opening without slicing off a thin
+are collinear. The uniform 34-point channel is slightly heavier than the 28–30 point gap
+around the microphone. The cutout’s exposed corners have a 7-point radius,
+so the waveform meets the outer edges with soft junctions. It exits through the C's opening without slicing off a thin
 upper fragment. The C and microphone use separate geometry, with white space between
 them so the C stays dominant. The complete mark is shifted left (20 points on
 the 1024-point canvas) for optical balance; the tile stays in its original position.

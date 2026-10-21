@@ -82,7 +82,7 @@ func waveformPath(pixels: Int) -> NSBezierPath {
                             y: origin.y + axis.dy * along + axis.dx * across)
         if index == 0 { p.move(to: point) } else { p.line(to: point) }
     }
-    p.lineWidth = 28
+    p.lineWidth = 34
     p.lineJoinStyle = .round
     p.lineCapStyle = .round
     return p
@@ -93,7 +93,16 @@ func cutoutPath(pixels: Int) -> NSBezierPath {
     let waveform = waveformPath(pixels: pixels)
     let channel = waveform.cgPath.copy(strokingWithWidth: waveform.lineWidth,
                                       lineCap: .round, lineJoin: .round, miterLimit: 2)
-    return NSBezierPath(cgPath: body.subtracting(channel))
+    let cutout = body.subtracting(channel)
+    // Inset and restore the silhouette with round joins. This gives the newly
+    // exposed corners a 7-point radius before applying the shared inner shadow.
+    let radius: CGFloat = 7
+    let edge = cutout.copy(strokingWithWidth: radius * 2,
+                          lineCap: .round, lineJoin: .round, miterLimit: 2)
+    let inset = cutout.subtracting(edge)
+    let roundedEdge = inset.copy(strokingWithWidth: radius * 2,
+                                 lineCap: .round, lineJoin: .round, miterLimit: 2)
+    return NSBezierPath(cgPath: inset.union(roundedEdge))
 }
 
 func recess(_ path: NSBezierPath, pixels: Int) {
