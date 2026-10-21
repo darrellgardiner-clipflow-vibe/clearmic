@@ -14,6 +14,8 @@ import XCTest
     var chosen: [String] = []
     var recording = false
     var starts = 0
+    var durations: [TimeInterval] = []
+    var isRecording: Bool { recording }
     var meter: Float = -18
     var testError: Error?
 
@@ -22,9 +24,9 @@ import XCTest
     func activate() throws { activationCount += 1 }
     func select(_ id: String) throws { chosen.append(id); activeInput = inputs.first { $0.id == id } }
     func setGain(_ value: Float) throws { gain = value }
-    func startLevelTest() throws {
+    func startLevelTest(duration: TimeInterval) throws {
         if let testError { throw testError }
-        recording = true; starts += 1
+        recording = true; starts += 1; durations.append(duration)
     }
     func peak() -> Float { meter }
     func stopLevelTest() { recording = false }
@@ -57,14 +59,17 @@ final class MicrophoneSessionTests: XCTestCase {
         XCTAssertTrue(hardware.recording)
         session.prepareCamera()
         XCTAssertEqual(session.state, .cameraHandoff)
-        XCTAssertFalse(hardware.recording)
+        XCTAssertTrue(hardware.recording)
+        XCTAssertEqual(hardware.durations, [30, 300])
+        session.poll()
+        XCTAssertEqual(session.peakDB, -18)
         XCTAssertEqual(hardware.deactivationCount, 0)
         hardware.onEvent?(.interrupted)
-        XCTAssertEqual(session.state, .cameraHandoff)
+        XCTAssertEqual(session.state, .cameraReleased)
         hardware.activeInput = hardware.phone
         hardware.onEvent?(.routeChanged)
         session.returnedToForeground()
-        XCTAssertEqual(session.state, .cameraHandoff)
+        XCTAssertEqual(session.state, .cameraReleased)
         XCTAssertEqual(hardware.activationCount, 1)
         XCTAssertEqual(hardware.chosen, ["dji"])
         XCTAssertTrue(session.diagnostics.contains("Camera audio input: not observable by this app"))
@@ -186,4 +191,74 @@ final class MicrophoneSessionTests: XCTestCase {
         XCTAssertNil(session.verifiedInput)
         XCTAssertFalse(hardware.recording)
     }
+    @MainActor func testCameraCaptureStartsWithoutLevelTestAndSurvivesForegroundReturn() async {
+        let hardware = Hardware(), session: MicrophoneSession
+        session = MicrophoneSession(hardware: hardware)
+        await session.select("dji")
+        session.prepareCamera()
+        XCTAssertTrue(hardware.recording)
+        XCTAssertEqual(hardware.durations, [300])
+        for _ in 0..<301 { session.poll() }
+        session.returnedToForeground()
+        XCTAssertEqual(session.state, .cameraHandoff)
+        XCTAssertTrue(session.isCapturing)
+        XCTAssertEqual(hardware.starts, 1)
+        hardware.onEvent?(.testFinished)
+        XCTAssertEqual(session.state, .cameraReleased)
+        XCTAssertFalse(hardware.recording)
+        XCTAssertFalse(session.isCapturing)
+        session.returnedToForeground()
+        XCTAssertEqual(hardware.starts, 1)
+    }
+
+    @MainActor func testCameraCaptureStopsOnExplicitStopAndDoesNotRestart() async {
+        let hardware = Hardware(), session: MicrophoneSession
+        session = MicrophoneSession(hardware: hardware)
+        await session.select("dji")
+        session.prepareCamera()
+        session.stop()
+        session.returnedToForeground()
+        hardware.onEvent?(.testFinished)
+        XCTAssertEqual(session.state, .idle)
+        XCTAssertFalse(hardware.recording)
+        XCTAssertEqual(hardware.starts, 1)
+        XCTAssertEqual(hardware.deactivationCount, 1)
+    }
+
+    @MainActor func testCameraCaptureFailureDoesNotClaimMicrophoneIsActive() async {
+        let hardware = Hardware(), session: MicrophoneSession
+        session = MicrophoneSession(hardware: hardware)
+        await session.select("dji")
+        hardware.testError = NSError(domain: "Capture", code: 1)
+        session.prepareCamera()
+        guard case .failed = session.state else { return XCTFail("Capture failure must be visible") }
+        XCTAssertFalse(session.isCapturing)
+        XCTAssertFalse(hardware.recording)
+    }
+
+    @MainActor func testCameraCaptureNeverContinuesOnSubstituteMicrophone() async {
+        let hardware = Hardware(), session: MicrophoneSession
+        session = MicrophoneSession(hardware: hardware)
+        await session.select("dji")
+        session.prepareCamera()
+        hardware.activeInput = hardware.phone
+        hardware.onEvent?(.routeChanged)
+        XCTAssertEqual(session.state, .sourceLost)
+        XCTAssertFalse(hardware.recording)
+        XCTAssertFalse(session.isCapturing)
+        XCTAssertEqual(hardware.chosen, ["dji"])
+    }
+
+    @MainActor func testForegroundDetectsBackgroundCaptureThatEndedWithoutCallback() async {
+        let hardware = Hardware(), session: MicrophoneSession
+        session = MicrophoneSession(hardware: hardware)
+        await session.select("dji")
+        session.prepareCamera()
+        hardware.recording = false
+        session.returnedToForeground()
+        XCTAssertEqual(session.state, .cameraReleased)
+        XCTAssertFalse(session.isCapturing)
+        XCTAssertEqual(hardware.starts, 1)
+    }
+
 }

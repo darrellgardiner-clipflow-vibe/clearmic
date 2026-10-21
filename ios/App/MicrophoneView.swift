@@ -30,7 +30,7 @@ struct MicrophoneView: View {
                     Label(session.state == .preparing ? "Checking microphones…" : session.selectedID.isEmpty ? "Find microphones" : "Reconnect & recheck", systemImage: "antenna.radiowaves.left.and.right")
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }.buttonStyle(InstrumentButton(active: true)).disabled(session.state == .preparing)
-                Text("Microphone access is requested when you connect. A level test records up to 30 seconds temporarily, then deletes it. ClearMic does not play your mic through the speaker.")
+                Text("Microphone access is requested when you connect. A level test records up to 30 seconds. Prepare Camera keeps temporary capture active in the background for up to 5 minutes. Audio is deleted when capture ends. ClearMic does not play your mic through the speaker.")
                     .font(.caption).foregroundStyle(.secondary)
                 if !session.inputs.isEmpty {
                     section("01 / INPUT") {
@@ -67,11 +67,11 @@ struct MicrophoneView: View {
                             .font(.caption).foregroundStyle(.secondary)
                         HStack(spacing: 4) {
                             ForEach(0..<24, id: \.self) { index in
-                                RoundedRectangle(cornerRadius: 1).fill(session.state == .testing && session.peakDB > -60 + Float(index) * 2.5 ? orange : Color.primary.opacity(0.10))
+                                RoundedRectangle(cornerRadius: 1).fill(session.isCapturing && session.peakDB > -60 + Float(index) * 2.5 ? orange : Color.primary.opacity(0.10))
                                     .frame(height: 18)
                             }
-                        }.accessibilityLabel("Microphone peak").accessibilityValue(session.state == .testing ? "\(Int(session.peakDB)) decibels" : "Test stopped")
-                        Text(session.state == .testing ? String(format: "%.1f dBFS", session.peakDB) : "Speak during the level test")
+                        }.accessibilityLabel("Microphone peak").accessibilityValue(session.isCapturing ? "\(Int(session.peakDB)) decibels" : "Test stopped")
+                        Text(session.isCapturing ? String(format: "%.1f dBFS", session.peakDB) : "Speak during the level test")
                             .font(.system(size: 12, design: .monospaced))
                         Button(session.state == .testing ? "Stop level test" : "Test microphone") {
                             if session.state == .testing { session.stopTest() } else { session.startTest() }
@@ -95,10 +95,12 @@ struct MicrophoneView: View {
                     if session.state == .cameraHandoff {
                         Text("Switch to Apple's Camera app and record a short video. Speak into the Bluetooth mic while the iPhone is farther away, then play the video back to check which microphone it used.")
                             .font(.subheadline)
-                        Text("ClearMic's test is stopped. The audio session remains prepared until iOS takes control. Return here and reconnect to test again.")
+                        Text("Your mic stays active while you switch, for up to 5 minutes or until another app interrupts it. Stop ends capture and deletes temporary audio.")
                             .font(.caption).foregroundStyle(.secondary)
+                    } else if session.state == .cameraReleased {
+                        Text("ClearMic is no longer capturing. iOS interrupted it or the 5-minute limit ended. Check your Camera video, then reconnect for another attempt.").font(.caption).foregroundStyle(.secondary)
                     } else {
-                        Text("Stops the level test and leaves the selected audio session prepared. You then switch to Camera yourself.").font(.caption).foregroundStyle(.secondary)
+                        Text("Keeps your selected mic active in the background for up to 5 minutes while you switch to Camera.").font(.caption).foregroundStyle(.secondary)
                     }
                     Text("Experimental: iOS may choose a different input in Camera. This app cannot confirm or force Camera's microphone, or send ClearMic EQ into its recording.")
                         .font(.caption).foregroundStyle(.secondary)

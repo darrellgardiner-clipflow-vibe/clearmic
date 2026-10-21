@@ -19,19 +19,20 @@ public enum AudioEvent: Sendable {
     var inputs: [Microphone] { get }
     var activeInput: Microphone? { get }
     var gain: Float? { get }
+    var isRecording: Bool { get }
     var onEvent: ((AudioEvent) -> Void)? { get set }
     func requestPermission() async -> Bool
     func activate() throws
     func select(_ id: String) throws
     func setGain(_ value: Float) throws
-    func startLevelTest() throws
+    func startLevelTest(duration: TimeInterval) throws
     func peak() -> Float
     func stopLevelTest()
     func deactivate() throws
 }
 
 public enum MicrophoneState: Equatable {
-    case idle, preparing, ready, testing, cameraHandoff, interrupted, sourceLost
+    case idle, preparing, ready, testing, cameraHandoff, cameraReleased, interrupted, sourceLost
     case failed(String)
 
     public var title: String {
@@ -40,7 +41,8 @@ public enum MicrophoneState: Equatable {
         case .preparing: return "Checking input"
         case .ready: return "Input ready"
         case .testing: return "Testing microphone"
-        case .cameraHandoff: return "Ready to try Camera"
+        case .cameraHandoff: return "Microphone active for Camera"
+        case .cameraReleased: return "ClearMic capture ended"
         case .interrupted: return "Audio session interrupted"
         case .sourceLost: return "Selected microphone lost"
         case .failed: return "Input unavailable"
@@ -61,6 +63,7 @@ public enum MicrophoneState: Equatable {
     private var active = false
     private var elapsedTicks = 0
 
+    public var isCapturing: Bool { state == .testing || state == .cameraHandoff }
     public var selected: Microphone? { inputs.first { $0.id == selectedID } }
     public var canTest: Bool { state == .ready && verifiedInput?.id == selectedID }
     public var canHandoff: Bool { (state == .ready || state == .testing) && verifiedInput?.id == selectedID }
@@ -126,7 +129,7 @@ public enum MicrophoneState: Equatable {
         guard canTest else { return }
         guard hardware.activeInput?.id == selectedID else { loseSource(); return }
         do {
-            try hardware.startLevelTest()
+            try hardware.startLevelTest(duration: 30)
             guard hardware.activeInput?.id == selectedID else { loseSource(); return }
             elapsedTicks = 0
             state = .testing
@@ -144,9 +147,21 @@ public enum MicrophoneState: Equatable {
     public func prepareCamera() {
         guard canHandoff else { return }
         guard hardware.activeInput?.id == selectedID else { loseSource(); return }
+        do {
+            // Start a fresh bounded recording while still foregrounded, so iOS
+            // can keep the selected input active as the user switches apps.
+            try hardware.startLevelTest(duration: 300)
+            guard hardware.activeInput?.id == selectedID else { loseSource(); return }
+            peakDB = -120
+            state = .cameraHandoff
+            log("Microphone capture remains active for up to 5 minutes while switching apps. Another app may interrupt it; Camera input is not observable by ClearMic.")
+        } catch { fail(error.localizedDescription) }
+    }
+
+    private func finishHandoff(_ reason: String) {
         hardware.stopLevelTest(); peakDB = -120
-        state = .cameraHandoff
-        log("Prepared for Camera using \(verifiedInput?.name ?? "microphone"). Camera input is not observable by ClearMic.")
+        state = .cameraReleased
+        log(reason)
     }
 
     public func setGain(_ value: Float) {
@@ -165,18 +180,22 @@ public enum MicrophoneState: Equatable {
     }
 
     public func poll() {
-        guard state == .testing else { return }
+        guard isCapturing else { return }
         guard hardware.activeInput?.id == selectedID else { loseSource(); return }
         let level = hardware.peak()
         peakDB = level.isFinite ? min(0, max(-120, level)) : -120
-        elapsedTicks += 1
-        if elapsedTicks >= 300 { stopTest() }
+        if state == .testing {
+            elapsedTicks += 1
+            if elapsedTicks >= 300 { stopTest() }
+        }
     }
 
     public func returnedToForeground() {
         inputs = hardware.inputs
         // Opening Camera can take ownership. Do not reclaim the route automatically.
         if state == .cameraHandoff {
+            if hardware.activeInput?.id != selectedID { loseSource() }
+            else if !hardware.isRecording { finishHandoff("Background capture ended. Reconnect to try again.") }
             log("Returned from Camera. Its recorded input must be checked in the video.")
         } else if active, state == .ready || state == .testing {
             if hardware.activeInput?.id != selectedID { loseSource() }
@@ -195,19 +214,22 @@ public enum MicrophoneState: Equatable {
         switch event {
         case .routeChanged:
             inputs = hardware.inputs
-            guard state != .preparing else { return }
+            guard state != .preparing, state != .cameraReleased else { return }
             if state == .cameraHandoff {
-                log("System route changed during Camera handoff.")
+                if hardware.activeInput?.id != selectedID { loseSource() }
+                else { log("System route changed; selected input remains active.") }
             } else if hardware.activeInput?.id != selectedID && !selectedID.isEmpty { loseSource() }
         case .interrupted:
             hardware.stopLevelTest(); peakDB = -120
-            if state == .cameraHandoff { log("Another app took audio control during handoff.") }
+            if state == .cameraHandoff { finishHandoff("iOS interrupted ClearMic capture during handoff. Camera input must be checked in the video.") }
             else { generation += 1; state = .interrupted; verifiedInput = nil; log("Audio interrupted. Reconnect explicitly to resume.") }
         case .mediaReset:
             generation += 1; hardware.stopLevelTest(); active = false
             state = .interrupted; verifiedInput = nil; peakDB = -120
             log("iOS reset its audio service. Reconnect to prepare the microphone again.")
-        case .testFinished: stopTest()
+        case .testFinished:
+            if state == .cameraHandoff { finishHandoff("The 5-minute background capture ended. Reconnect to try again.") }
+            else { stopTest() }
         case .testFailed(let reason): fail(reason)
         }
     }

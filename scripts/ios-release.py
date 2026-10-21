@@ -150,7 +150,7 @@ class AppStore:
             localizations = self.request(f'/v1/builds/{build["id"]}/betaBuildLocalizations')['data']
             if not localizations:
                 self.request('/v1/betaBuildLocalizations', 'POST', {'data': {'type': 'betaBuildLocalizations', 'attributes': {
-                    'locale': CONFIG['locale'], 'whatsNew': 'Experimental Bluetooth mic routing. Pair your transmitter in Settings, choose it in ClearMic, test levels, then Prepare Camera and switch to Camera. Verify the recorded mic yourself. Receiver-free Camera compatibility is not guaranteed. Temporary tests stop after 30 seconds and are deleted.'},
+                    'locale': CONFIG['locale'], 'whatsNew': 'Experimental Bluetooth mic routing. Pair your transmitter in Settings, choose it in ClearMic, test levels, then Prepare Camera and switch to Camera. Verify the recorded mic yourself. Receiver-free Camera compatibility is not guaranteed. Level tests last 30 seconds. Prepare Camera keeps temporary capture active in the background for up to 5 minutes, stopping on interruption or Stop. Temporary audio is deleted.'},
                     'relationships': {'build': {'data': {'type': 'builds', 'id': build['id']}}}}})
         print('Internal testing configured for the existing owner tester; no external testers or App Review submission.')
         self.status()

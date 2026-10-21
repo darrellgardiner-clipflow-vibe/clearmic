@@ -32,6 +32,7 @@ import RouteCore
 
     var inputs: [Microphone] { (session.availableInputs ?? []).map(Self.microphone) }
     var activeInput: Microphone? { session.currentRoute.inputs.first.map(Self.microphone) }
+    var isRecording: Bool { recorder?.isRecording == true }
     var gain: Float? { session.isInputGainSettable ? session.inputGain : nil }
 
     func requestPermission() async -> Bool { await AVAudioApplication.requestRecordPermission() }
@@ -51,7 +52,7 @@ import RouteCore
 
     func setGain(_ value: Float) throws { try session.setInputGain(value) }
 
-    func startLevelTest() throws {
+    func startLevelTest(duration: TimeInterval) throws {
         stopLevelTest()
         guard session.sampleRate > 0 else { throw AudioFailure("The input has no active sample rate. Reconnect it and try again.") }
         let recorder = try AVAudioRecorder(url: testURL, settings: [
@@ -65,7 +66,7 @@ import RouteCore
         self.recorder = recorder
         recorder.delegate = self
         recorder.isMeteringEnabled = true
-        guard recorder.prepareToRecord(), recorder.record(forDuration: 30) else {
+        guard recorder.prepareToRecord(), recorder.record(forDuration: duration) else {
             stopLevelTest()
             throw AudioFailure("iOS could not start the microphone test. Another app may be using the input.")
         }
